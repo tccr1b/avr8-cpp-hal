@@ -1,0 +1,359 @@
+#ifndef UART_HPP
+#define UART_HPP
+
+#include "registers.hpp"
+#include "utils.hpp"
+#include "HAL/utils/ring_buffer.hpp"
+#include <avr/interrupt.h>
+
+#define TX_BUFFER_SIZE 64 //64 Byte
+#define RX_BUFFER_SIZE 64 //64 Byte
+
+using namespace atmega328p;
+using namespace HAL;
+
+enum class BaudRate  : uint32_t{
+    _2400bps    = 2400,
+    _4800bps    = 4800,
+    _9600bps    = 9600,
+    _14400bps   = 14400,
+    _19200bps   = 19200,
+    _28800bps   = 28800,
+    _38400bps   = 38400,
+    _57600bps   = 57600,
+    _76800bps   = 76800,
+    _115200bps  = 115200,
+    _230400bps  = 230400,
+    _250kbps  = 250000,
+    _500kbps    = 500000,
+    _1Mbps      = 1000000,
+    _1500kbps    = 1500000,
+    _2Mbps      = 2000000,
+};
+enum class UsartMode : uint8_t{
+    Asynchronous    = 0x00, // 0b00000000
+    Synchronous     = 0x40, // 0b01000000
+    MasterSPI       = 0xC0, // 0b11000000
+};
+enum class ClockEdge : uint8_t{
+    TxOnRisingRxOnFalling = 0, //Tx data changed on rising edge of XCK, Rx data sampled on falling edge
+    TxOnFallingRxOnRising = 1, //Tx data changed on falling edge of XCK, Rx data sampled on rising edge
+};
+enum class ParityMode: uint8_t{
+    Disabled    = 0,
+    EvenParity  = 1,
+    OddParity   = 2,
+};
+enum class DataSize  : uint8_t{
+    //i.e. Character SiZe
+    _5bit = 0,
+    _6bit = 1,
+    _7bit = 2,
+    _8bit = 3,
+    _9bit = 4,
+};
+enum class StopBits  : uint8_t{
+    One = 0,
+    Two = 1,
+};
+enum class BitOrder  : uint8_t{
+    MsbFirst = 0,
+    LsbFirst = 1
+};
+
+class Uart{
+private:
+    static RingBuffer<uint8_t,TX_BUFFER_SIZE> txBuffer;
+    static RingBuffer<uint8_t,RX_BUFFER_SIZE> rxBuffer;
+    static bool transmissionsCompleted(){
+        return (!Regs::Uart::UCSR0A.readBit(RegBits::Uart::UCSR0A_RXC0) && 
+                Regs::Uart::UCSR0A.readBit(RegBits::Uart::UCSR0A_TXC0));
+    }
+    static void setUsartMode(UsartMode usartMode){
+        switch (usartMode){
+        case UsartMode::Asynchronous:
+            Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_UMSEL00 |
+                                            RegBits::Uart::UCSR0C_UMSEL01);
+            break;
+        case UsartMode::Synchronous:
+            Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_UMSEL01);
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UMSEL00);
+            break;
+        case UsartMode::MasterSPI:
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UMSEL00 |
+                                          RegBits::Uart::UCSR0C_UMSEL01);
+            /*The power reduction USART bit, PRUSART0 must be disabled by writing a logical zero to it.*/
+            Regs::Core::PRR.clearBitmask(RegBits::Core::PRR_PRUSAR0);
+            break;
+        }
+    }
+    static UsartMode getUsartMode(){
+        return static_cast<UsartMode>(static_cast<uint8_t>(Regs::Uart::UCSR0C) & 0xC0); // 0b11000000
+    }
+    static void enableDoubleSpeed(){
+        // Enable double speed only if baud rate is not yet set.
+        if (static_cast<uint8_t>(Regs::Uart::UBRR0L) == 0x00 && 
+            static_cast<uint8_t>(Regs::Uart::UBRR0H) == 0x00){
+            Regs::Uart::UCSR0A.setBitmask(RegBits::Uart::UCSR0A_U2X0);
+        }
+    }
+    static void disableDoubleSpeed(){
+        Regs::Uart::UCSR0A.clearBitmask(RegBits::Uart::UCSR0A_U2X0);
+    }
+    static void setParityMode(ParityMode parityMode){
+        switch (parityMode){
+        case ParityMode::Disabled:
+            Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_UPM00 | 
+                                            RegBits::Uart::UCSR0C_UPM01);
+            break;
+        case ParityMode::EvenParity:
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UPM01);
+            Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_UPM00);
+            break;
+        case ParityMode::OddParity:
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UPM00 | 
+                                          RegBits::Uart::UCSR0C_UPM01);
+            break;
+        }
+    }
+    static void setStopBit(StopBits stopBit){
+        if(stopBit == StopBits::Two){
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_USBS0);
+        }else{
+            Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_USBS0);
+        }
+    }
+    static void setDataSize(DataSize dataSize){
+        switch (dataSize){
+        case DataSize::_5bit:
+            Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_UCSZ00 |
+                                            RegBits::Uart::UCSR0C_UCSZ01);
+            Regs::Uart::UCSR0B.clearBitmask(RegBits::Uart::UCSR0B_UCSZ02);
+            break;
+        case DataSize::_6bit:
+            Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_UCSZ01);
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UCSZ00);
+            Regs::Uart::UCSR0B.clearBitmask(RegBits::Uart::UCSR0B_UCSZ02);
+            break;
+        case DataSize::_7bit:
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UCSZ01);
+            Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_UCSZ00);
+            Regs::Uart::UCSR0B.clearBitmask(RegBits::Uart::UCSR0B_UCSZ02);
+            break;
+        case DataSize::_8bit:
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UCSZ00 | 
+                                          RegBits::Uart::UCSR0C_UCSZ01);
+            Regs::Uart::UCSR0B.clearBitmask(RegBits::Uart::UCSR0B_UCSZ02);
+            break;
+        case DataSize::_9bit:
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UCSZ00 | 
+                                          RegBits::Uart::UCSR0C_UCSZ01);
+            Regs::Uart::UCSR0B.setBitmask(RegBits::Uart::UCSR0B_UCSZ02);
+            break;
+        }
+    }
+    static void setClockEdge(ClockEdge xckEdge){                
+        switch (xckEdge){
+        case ClockEdge::TxOnFallingRxOnRising:
+            Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UCPOL0);
+            break;
+        case ClockEdge::TxOnRisingRxOnFalling:
+            Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_UCPOL0);
+            break;
+        }
+    }
+    static void setBaudRate (BaudRate baud){
+        uint8_t modeDivisorConstant;
+        switch (getUsartMode()){
+        case UsartMode::Asynchronous:
+            if(Regs::Uart::UCSR0A.readBit(RegBits::Uart::UCSR0A_U2X0)){
+                modeDivisorConstant = 8;   //Double Speed: U2X0:1
+            }else{
+                modeDivisorConstant = 16;  //Normal Speed: U2X0:0
+            }
+            break;
+        case UsartMode::Synchronous:
+            modeDivisorConstant = 2;
+            break;
+        case UsartMode::MasterSPI:  
+            modeDivisorConstant = 2;
+            break;
+        }
+
+        uint32_t baudValue = static_cast<uint32_t>(baud);
+        uint16_t ubrrValue = (F_CPU / (modeDivisorConstant * baudValue)) - 1;
+        // UBRR0H (Üst 4 bit) ve UBRR0L (Alt 8 bit)
+        Regs::Uart::UBRR0H.setValue(static_cast<uint8_t>(ubrrValue >> 8));
+        Regs::Uart::UBRR0L.setValue(static_cast<uint8_t>(ubrrValue));
+    }
+    static void setDataOrder(BitOrder bitOrder){
+        if(getUsartMode() == UsartMode::MasterSPI){
+            if(static_cast<bool>(bitOrder)){
+                Regs::Uart::UCSR0C.setBitmask(RegBits::Uart::UCSR0C_UDORD0);
+            }else{
+                Regs::Uart::UCSR0C.clearBitmask(RegBits::Uart::UCSR0C_UDORD0);
+            }
+        }
+    }
+public:
+    /* Checking*/
+    [[nodiscard]] static bool isReceivingCompleted(){
+        return Regs::Uart::UCSR0A.readBit(RegBits::Uart::UCSR0A_RXC0);
+    }
+    [[nodiscard]] static bool isTransmittingCompleted(){
+        return Regs::Uart::UCSR0A.readBit(RegBits::Uart::UCSR0A_TXC0);
+    }
+    [[nodiscard]] static bool isReceiverEnabled(){
+        return Regs::Uart::UCSR0B.readBit(RegBits::Uart::UCSR0B_RXEN0);
+    }
+    [[nodiscard]] static bool isTransmitterEnabled(){
+        return Regs::Uart::UCSR0B.readBit(RegBits::Uart::UCSR0B_TXEN0);
+    }
+    [[nodiscard]] static bool isDataRegisterEmpty(){
+        return Regs::Uart::UCSR0A.readBit(RegBits::Uart::UCSR0A_UDRE0);
+    }
+    [[nodiscard]] static bool checkDataOverrun(){
+        return Regs::Uart::UCSR0A.readBit(RegBits::Uart::UCSR0A_DOR0);
+    }
+    [[nodiscard]] static bool checkFrameError(){
+        return Regs::Uart::UCSR0A.readBit(RegBits::Uart::UCSR0A_FE0);
+    }
+    [[nodiscard]] static bool checkParityError(){
+        return Regs::Uart::UCSR0A.readBit(RegBits::Uart::UCSR0A_UPE0);
+    }
+    
+    /* Controlling*/
+    static void enableDataRegEmptyInterrupt(){
+        Regs::Uart::UCSR0B.setBitmask(RegBits::Uart::UCSR0B_UDRIE0);
+    }
+    static void disableDataRegEmptyInterrupt(){
+        Regs::Uart::UCSR0B.clearBitmask(RegBits::Uart::UCSR0B_UDRIE0);
+    }
+    static void enableMultiprocessorMode(){
+        Regs::Uart::UCSR0A.setBitmask(RegBits::Uart::UCSR0A_MPCM0);
+    }
+    static void disableMultiprocessorMode(){
+        Regs::Uart::UCSR0A.clearBitmask(RegBits::Uart::UCSR0A_MPCM0);
+    }
+    static void enableReceiver(){
+        Regs::Uart::UCSR0B.setBitmask(RegBits::Uart::UCSR0B_RXEN0);
+    }
+    static void disableReceiver(){
+        Regs::Uart::UCSR0B.clearBitmask(RegBits::Uart::UCSR0B_RXEN0);
+    }
+    static void enableTransmitter(){
+        Regs::Uart::UCSR0B.setBitmask(RegBits::Uart::UCSR0B_TXEN0);
+    }
+    static void disableTransmitter(){
+        Regs::Uart::UCSR0B.clearBitmask(RegBits::Uart::UCSR0B_TXEN0);
+    }
+    static void enableRxCompleteInterrupt(){
+        Regs::Uart::UCSR0B.setBitmask(RegBits::Uart::UCSR0B_RXCIE0);
+    }
+    static void disableRxCompleteInterrupt(){
+        Regs::Uart::UCSR0B.clearBitmask(RegBits::Uart::UCSR0B_RXCIE0);
+    }
+    static void enableTxCompleteInterrupt(){
+        Regs::Uart::UCSR0B.setBitmask(RegBits::Uart::UCSR0B_TXCIE0);
+    }
+    static void disableTxCompleteInterrupt(){
+        Regs::Uart::UCSR0B.clearBitmask(RegBits::Uart::UCSR0B_TXCIE0);
+    }
+    
+    static void handleRxInterrupt(){
+        uint8_t data = Regs::Uart::UDR0;
+        if(!rxBuffer.isFull()){rxBuffer.push(data);}
+    }
+    static void handleTxInterrupt(){
+        uint8_t data;
+
+        if(txBuffer.pop(data)){
+            Regs::Uart::UDR0.setValue(data);
+        }else{
+            disableDataRegEmptyInterrupt();
+        }
+    }
+    static void init(UsartMode uartMode     = UsartMode::Asynchronous, 
+                     BaudRate baud          = BaudRate::_9600bps, 
+                     DataSize dataSize      = DataSize::_8bit, 
+                     StopBits stopBit       = StopBits::One, 
+                     ParityMode parityMode  = ParityMode::Disabled,
+                     bool useDoubleSpeed    = false){
+        /* Uart çalışma ayarı*/
+        setUsartMode(uartMode);
+        
+        /* Mode-specific settings*/
+        //setClockEdge(ClockEdge::TxOnFallingRxOnRising);
+        if(uartMode != UsartMode::Asynchronous){setClockEdge(ClockEdge::TxOnFallingRxOnRising);} // Write this bit to zero when asynchronous mode is used
+        
+        /* Baudrate settings */
+        if (useDoubleSpeed && uartMode == UsartMode::Asynchronous) {
+            enableDoubleSpeed();
+        } else {
+            disableDoubleSpeed();
+        }
+
+        setBaudRate(baud);
+
+        /* Frame ayarları*/
+        setDataSize(dataSize);
+        setParityMode(parityMode);
+        setStopBit(stopBit);
+
+        /* RX'i ve TX'i etkinleştir*/
+        enableReceiver();
+        enableTransmitter();
+    }
+    static void reset(){
+        disableRxCompleteInterrupt();
+        disableTxCompleteInterrupt();
+        disableReceiver();
+        disableTransmitter();
+        disableDoubleSpeed();
+        disableDataRegEmptyInterrupt();
+        Regs::Uart::UBRR0H = 0x00;
+        Regs::Uart::UBRR0L = 0x00;
+    }
+    static void transmitData(uint8_t data){
+        // HAL::WatchdogTimer.feed();
+        while(txBuffer.isFull()){
+            // Opsiyonel: Burada "watchdog reset" veya "yield" yapılabilir.
+            //HAL::WatchdogTimer.reset();
+        }
+
+        //2. Veriyi tampona at
+        txBuffer.push(data);
+
+        // 3. UDRIE (Data Register Empty Interrupt) Kesmesini AÇ
+        // Bunu açtığımız an, donanım "Ben boşum" diyecek ve ISR'a atlayacak.
+        enableDataRegEmptyInterrupt();
+    }
+    [[nodiscard]] static bool isAvailable(){
+        return !rxBuffer.isEmpty();
+    }
+    static uint8_t read(){
+        uint8_t data = 0;
+        if(rxBuffer.pop(data)){
+            return data;
+        }
+        return 0; // Buffer boşsa 0 veya hata kodu döner
+    }
+};
+
+
+// Sınıf dışına eklenecekler:
+// --- Statik Üyeler İçin Bellek Ayırma (Definition) ---
+HAL::RingBuffer<uint8_t, TX_BUFFER_SIZE> Uart::txBuffer;
+HAL::RingBuffer<uint8_t, RX_BUFFER_SIZE> Uart::rxBuffer;
+
+// --- 1. VERİ ALMA KESMESİ (RX Complete) ---
+// Donanım: "Yeni bir harf geldi!" dediğinde çalışır.
+ISR(USART_RX_vect){Uart::handleRxInterrupt();}
+
+// --- 2. VERİ GÖNDERME KESMESİ (Data Register Empty) ---
+// Donanım: "Bir önceki harfi gönderdim, sıradakini ver!" dediğinde çalışır.
+ISR(USART_UDRE_vect){Uart::handleTxInterrupt();}
+
+
+
+#endif //UART_HPP

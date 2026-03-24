@@ -1,0 +1,240 @@
+#ifndef SYS_CTRL_HPP
+#define SYS_CTRL_HPP
+#define __AVR_ATmega328P__
+
+#define BITMASK_SLEEPMODE   0xF1
+
+#include <avr/boot.h>
+#include <avr/interrupt.h>
+#include "registers.hpp"
+#include <inttypes.h>
+#include "serialstream.hpp"
+
+
+enum class SleepMode : uint8_t{
+    Idle              = 0x00,
+    AdcNoiseReduction = RegBits::Core::SMCR_SM0,
+    PowerDown         = RegBits::Core::SMCR_SM1,
+    PowerSave         = RegBits::Core::SMCR_SM0 | RegBits::Core::SMCR_SM1,
+    StandBy           = RegBits::Core::SMCR_SM2 | RegBits::Core::SMCR_SM1,
+    ExtendedStandBy   = RegBits::Core::SMCR_SM2 | RegBits::Core::SMCR_SM1 | RegBits::Core::SMCR_SM0,
+};
+enum class Prescaler : uint8_t{
+    NoDivision  = 0x00,
+    DividedBy2  = RegBits::Core::CLKPR_CLKPS0,
+    DividedBy4  = RegBits::Core::CLKPR_CLKPS1,
+    DividedBy8  = RegBits::Core::CLKPR_CLKPS0 | RegBits::Core::CLKPR_CLKPS1,
+    DividedBy16 = RegBits::Core::CLKPR_CLKPS2,
+    DividedBy32 = RegBits::Core::CLKPR_CLKPS2 | RegBits::Core::CLKPR_CLKPS0,
+    DividedBy64 = RegBits::Core::CLKPR_CLKPS2 | RegBits::Core::CLKPR_CLKPS1,
+    DividedBy128= RegBits::Core::CLKPR_CLKPS2 | RegBits::Core::CLKPR_CLKPS1 | RegBits::Core::CLKPR_CLKPS0,
+    DividedBy256= RegBits::Core::CLKPR_CLKPS3,
+};
+enum class Peripheral: uint8_t{
+    Twi     = RegBits::Core::PRR_PRTWI,
+    Timer2  = RegBits::Core::PRR_PRTIM2,
+    Timer0  = RegBits::Core::PRR_PRTIM0,
+    Timer1  = RegBits::Core::PRR_PRTIM1,
+    Spi     = RegBits::Core::PRR_PRSPI,
+    Usart0  = RegBits::Core::PRR_PRUSART0,
+    Adc     = RegBits::Core::PRR_PRADC,
+    All     = RegBits::Core::PRR_PRADC | RegBits::Core::PRR_PRSPI | RegBits::Core::PRR_PRTIM0| 
+              RegBits::Core::PRR_PRTIM1| RegBits::Core::PRR_PRTIM2| RegBits::Core::PRR_PRTWI |
+              RegBits::Core::PRR_PRUSART0,
+};
+
+enum class InterruptSense : uint8_t{
+    IRQonLowLevel         = 0x00, //Generate interrupt request on the low level of INTx
+    IRQonAnyLogicalChange = 0x01, //Generate interrupt request on any logical change of INTx
+    IRQonFallingEdge      = 0x02, //Generate interrupt request on falling edge of INTx
+    IRQonRisingEdge       = 0x03, //Generate interrupt request on rising edge of INTx
+};
+
+namespace mcu{
+namespace System{
+
+enum class ResetReason : uint8_t {
+    PowerOn     = (1 << 0),
+    External    = (1 << 1),
+    BrownOut    = (1 << 2),
+    Watchdog    = (1 << 3),
+    Unknown     = 0
+};
+
+// Global veya static bir değişken
+static uint8_t lastResetFlags = 0;
+
+static void captureResetReason() {
+    lastResetFlags = Regs::Core::McuStatusReg; // MCUSR
+    Regs::Core::McuStatusReg = 0x00; // Bir sonraki reset için temizle
+}
+
+void printSystemInfo() {
+    cstd::cout << "#=========== SYSTEM INFO ===========#" << cstd::endl;
+    
+    cstd::cout << "Reset Nedeni: ";
+    if (lastResetFlags & (uint8_t)ResetReason::PowerOn)  cstd::cout << "Guc Acildi (POR)";
+    if (lastResetFlags & (uint8_t)ResetReason::External) cstd::cout << "Reset Butonu";
+    if (lastResetFlags & (uint8_t)ResetReason::Watchdog) cstd::cout << "!!! WATCHDOG RESET !!!";
+    if (lastResetFlags & (uint8_t)ResetReason::BrownOut) cstd::cout << "Dusus Gerilim (BOD)";
+    cstd::cout << cstd::endl;
+
+    // ... diğer info bilgileri
+}
+
+class Sleep{
+    public:
+        static void setMode(SleepMode sleepMode){
+            mcu::Regs::Core::SleepModeControlReg.writeMasked(static_cast<uint8_t>(sleepMode), BITMASK_SLEEPMODE);
+        }
+        static SleepMode getMode(){
+            return static_cast<SleepMode>(~BITMASK_SLEEPMODE & Regs::Core::SleepModeControlReg.getValue());
+        }
+        static inline void enable(){
+            Regs::Core::SleepModeControlReg.setBitmask(RegBits::Core::SMCR_SE);
+        }
+        static inline void disable(){
+            Regs::Core::SleepModeControlReg.clearBitmask(RegBits::Core::SMCR_SE);
+        }
+        static bool isEnabled(){
+            return Regs::Core::SleepModeControlReg.readBit(RegBits::Core::SMCR_SE);
+        }
+};
+
+inline static void sleep(){
+    mcu::System::Sleep::enable();
+    __asm__ __volatile__ ("sleep");
+}
+
+static void enableExternalInterrupt0(){
+    Regs::Core::ExternalInterruptMaskReg.setBitmask(RegBits::Core::EIMSK_INT0);
+}
+static void enableExternalInterrupt1(){
+    Regs::Core::ExternalInterruptMaskReg.setBitmask(RegBits::Core::EIMSK_INT1);
+}
+static void disableExternalInterrupt0(){
+    Regs::Core::ExternalInterruptMaskReg.clearBitmask(RegBits::Core::EIMSK_INT0);
+}
+static void disableExternalInterrupt1(){
+    Regs::Core::ExternalInterruptMaskReg.clearBitmask(RegBits::Core::EIMSK_INT1);
+}
+static void setExtIntSensing0(InterruptSense intSense = InterruptSense::IRQonLowLevel){
+    Regs::Core::ExternalInterruptControlReg.writeBitmask(0xFC & static_cast<uint8_t>(intSense));
+}
+static void setExtIntSensing1(InterruptSense intSense = InterruptSense::IRQonLowLevel){
+    Regs::Core::ExternalInterruptControlReg.writeBitmask(0xF3 & (static_cast<uint8_t>(intSense) << 2));
+}
+static void clearExtIntFlag0(){
+    mcu::Regs::Core::ExternalInterruptFlagReg.setBitmask(RegBits::Core::EIFR_INTF0);
+}
+static void clearExtIntFlag1(){
+    mcu::Regs::Core::ExternalInterruptFlagReg.setBitmask(RegBits::Core::EIFR_INTF1);
+}
+static void setExtIntFlag0(){
+    if(!(mcu::Regs::Core::ExternalInterruptFlagReg & RegBits::Core::EIFR_INTF0)){
+        mcu::Regs::Core::ExternalInterruptFlagReg.setBitmask(RegBits::Core::EIFR_INTF0);
+    }
+}
+static void setExtIntFlag1(){
+    if(!(mcu::Regs::Core::ExternalInterruptFlagReg & RegBits::Core::EIFR_INTF1)){
+        mcu::Regs::Core::ExternalInterruptFlagReg.setBitmask(RegBits::Core::EIFR_INTF1);
+    }
+}
+static void attachInterrupt(){}
+static inline void globalInterruptEnable(){sei();}
+static inline void globalInterruptDisable(){cli();}
+
+class Fuses {
+    public:
+        // Sınıftan nesne üretilmesini engelle (sadece statik kullanılacak)
+        Fuses() = delete;
+        static inline uint8_t getLowFuseBits() {
+            return boot_lock_fuse_bits_get(GET_LOW_FUSE_BITS);
+        }
+        static inline uint8_t getHighFuseBits() {
+            return boot_lock_fuse_bits_get(GET_HIGH_FUSE_BITS);
+        }
+        static inline uint8_t getExtendedFuseBits() {
+            return boot_lock_fuse_bits_get(GET_EXTENDED_FUSE_BITS);
+        }
+        static inline uint8_t getLockBits() {
+            return boot_lock_fuse_bits_get(GET_LOCK_BITS);
+        }
+        static bool isBodEnabled(){
+            return (getExtendedFuseBits() ^ (uint8_t)0xFF); 
+        }
+        static inline uint32_t readSignature(){
+            return 0;
+        }
+    };
+
+class Power{
+public:
+    static void shutdownPeripheral(Peripheral p){
+        mcu::Regs::Core::PowerReductionReg.setBitmask(static_cast<uint8_t>(p));}
+    static void activatePeripheral(Peripheral p){
+        mcu::Regs::Core::PowerReductionReg.clearBitmask(static_cast<uint8_t>(p));}
+};
+
+class Clock{
+public:
+    static void         setClockPrescaler(Prescaler prescalerValue){
+        /* Save status reg and disable global interrupts*/
+        uint8_t sreg = Regs::Core::StatusReg;
+        cli();
+        /* Set Clock Prescaler Change Enable bit (enable bit only)*/
+        Regs::Core::ClockPrescaleReg = RegBits::Core::CLKPR_CLKPCE;
+        /* Write new prescaler value within 4 clock cycles*/
+        Regs::Core::ClockPrescaleReg.setValue(static_cast<uint8_t>(prescalerValue));
+        /* Restore status reg */
+        Regs::Core::StatusReg.setValue(sreg);
+    }
+    static Prescaler    getClockPrescaler(){
+        constexpr uint8_t bitmask_clk_prescaler = RegBits::Core::CLKPR_CLKPS3| 
+                                                  RegBits::Core::CLKPR_CLKPS2|
+                                                  RegBits::Core::CLKPR_CLKPS1|
+                                                  RegBits::Core::CLKPR_CLKPS0;
+        uint8_t currentPrescaler = (uint8_t)(Regs::Core::ClockPrescaleReg) & bitmask_clk_prescaler;                                                  
+        return static_cast<Prescaler>(currentPrescaler);
+    }
+    static uint32_t     getCpuFrequency(){
+        return (F_CPU >> static_cast<uint8_t>(getClockPrescaler()));
+    }
+    static uint8_t      getMasterClockSource(){
+        return (0x0F & Fuses::getLowFuseBits());
+    }
+    static const char*  getMasterClockSourceStr(){
+        uint8_t cksel   = getMasterClockSource();
+
+        switch (cksel){
+        case 0x00: return "External Clock"; break;                         // CKSEL3..0 = 0000 0x00
+        case 0x02: return "Calibrated Internal 8MHz RC Oscillator"; break; // CKSEL3..0 = 0010 0x02
+        case 0x03: return "Internal 128kHz RC Oscillator"; break;          // CKSEL3..0 = 0011 0x03
+        case 0x04:                                                         // CKSEL3..0 = 0100 0x04
+        case 0x05: return "Low Frequency Crystal Oscillator"; break;       // CKSEL3..0 = 0101 0x05
+        case 0x06:                                                         // CKSEL3..0 = 0110 0x06
+        case 0x07: return "Full Swing Crystal Oscillator"; break;          // CKSEL3..0 = 0111 0x07
+        case 0x08:                                                         // CKSEL3..0 = 1000 - 1111 
+        case 0x0F: return "Low Power Crystal Oscillator"; break;
+        default:
+            return "Unknown (or undefined) Clock Source";
+            break;
+        }
+    }
+    static bool         isDividedBy8(){
+        uint8_t lowFuse = Fuses::getLowFuseBits();
+        return !(lowFuse & (1 << 7));
+    }
+    static void         calibrateInternalOscillator(){}
+    static void         setOscCalValue(uint8_t calVal){
+        mcu::Regs::Core::OscillatorCalibrationReg = calVal;
+    }
+    static uint8_t      getOscCalValue(){
+        return mcu::Regs::Core::OscillatorCalibrationReg;
+    }
+};
+
+} //namespace System
+} //namespace mcu
+
+#endif //SYS_CTRL_HPP

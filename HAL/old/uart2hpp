@@ -1,0 +1,131 @@
+#ifndef DRIVERS_UART_HPP
+#define DRIVERS_UART_HPP
+
+//#include "HAL/registers.hpp"
+//#include "../HAL/utils/ring_buffer.hpp"
+//#include <avr/interrupt.h>
+
+using namespace atmega328p;
+
+enum class BaudRate : uint32_t{
+
+};
+
+enum class FrameFormat : uint8_t {
+
+};
+
+enum class ClockMode : uint8_t {
+    AsynchronousNormal =  RegBits::Uart::UCSR0C_UMSEL00 | RegBits::Uart::UCSR0C_UMSEL01,
+    AsynchronousDoubleSpeed = 0,
+    SynchronousMaster = 0,
+    SynchronousSlave = 0,
+};
+
+
+// Şablon Parametreleri:
+// Baud: İletişim hızı
+// TxSize: Gönderim Tampon Boyutu (Byte)
+// RxSize: Alım Tampon Boyutu (Byte)
+template <unsigned long Baud, uint16_t TxSize = 64, uint16_t RxSize = 64>
+class Uart {
+public:
+    // Tamponları Tanımla
+    static HAL::RingBuffer<uint8_t, TxSize> txBuffer;
+    static HAL::RingBuffer<uint8_t, RxSize> rxBuffer;
+
+    static void init() {
+        // 1. Baud Rate Hesabı (Compile-Time Constant)
+        // U2X0 (Double Speed) kapalı varsayıyoruz.
+        constexpr uint16_t ubrr = (F_CPU / 16 / Baud) - 1;
+
+        // Registerlara Yaz (HAL Mimarimizle)
+        // Not: Burada Register.hpp'deki tanımları kullandığınızı varsayıyorum
+        // Regs::Uart::BaudHigh = (uint8_t)(ubrr >> 8); ... gibi.
+        // Hızlıca standart register adlarıyla yazıyorum, HAL::Regs ile değiştirebilirsiniz:
+        
+        UBRR0H = (uint8_t)(ubrr >> 8);
+        UBRR0L = (uint8_t)ubrr;
+
+        // 2. Format: 8 data, 1 stop, no parity
+        UCSR0C = (1 << UCSZ01) | (1 << UCSZ00);
+
+        // 3. TX ve RX Aktif Et + RX Interrupt Aç
+        // TX Interrupt'ı (UDRIE0) şimdilik KAPALI. Veri gönderince açacağız.
+        UCSR0B = (1 << RXEN0) | (1 << TXEN0) | (1 << RXCIE0);
+        
+        sei(); // Global Interrupts
+    }
+
+    // --- Gönderme Fonksiyonu (Bloklamaz!) ---
+    static void send(uint8_t data) {
+        // 1. Veriyi tampona at
+        // Eğer tampon doluysa, yer açılana kadar beklemek (block) zorunda kalabiliriz
+        // veya veriyi çöpe atabiliriz. Güvenli olan beklemektir:
+        while (txBuffer.isFull()) {
+            // İsteğe bağlı: UDRE kesmesini zorla tetikle ki tampon boşalsın
+        }
+
+        txBuffer.push(data);
+
+        // 2. "Data Register Empty" Kesmesini Aç
+        // Bu kesme açıldığı an, donanım "Ben boşum!" diyecek ve ISR çalışacak.
+        UCSR0B |= (1 << UDRIE0);
+    }
+
+    // Metin Gönder
+    static void print(const char* str) {
+        while (*str) send(*str++);
+    }
+
+    // --- Kesme Servis Rutinleri (ISR Tarafından Çağrılır) ---
+    
+    // Veri Gönderme Mantığı (Arka Planda Çalışır)
+    static void handleTxInterrupt() {
+        uint8_t data;
+        if (txBuffer.pop(data)) {
+            // Tamponda veri var, donanıma yaz
+            UDR0 = data;
+        } else {
+            // Tampon boşaldı! Artık kesme üretme, sus.
+            UCSR0B &= ~(1 << UDRIE0);
+        }
+    }
+
+    // Veri Alma Mantığı
+    static void handleRxInterrupt() {
+        // Donanımdan oku, tampona at
+        if (!rxBuffer.isFull()) {
+            rxBuffer.push(UDR0);
+        } else {
+            // Tampon dolu, veriyi okuyup çöpe at (Overrun olmasın)
+            volatile uint8_t dummy = UDR0;
+            (void)dummy;
+        }
+    }
+};
+
+// Statik Üyeleri Başlat (Bellekte yer ayır)
+template <unsigned long B, uint16_t T, uint16_t R>
+HAL::RingBuffer<uint8_t, T> Uart<B, T, R>::txBuffer;
+
+template <unsigned long B, uint16_t T, uint16_t R>
+HAL::RingBuffer<uint8_t, R> Uart<B, T, R>::rxBuffer;
+
+// --- GLOBAL ISR BAĞLANTILARI ---
+// Bu kısım biraz kirli görünebilir ama C++ Template ile C ISR bağlamanın en pratik yoludur.
+// Projenizde sadece tek bir UART konfigürasyonu kullanacaksanız bu sorun olmaz.
+// Çoklu UART için "Template Specialization" veya "Callback" gerekir.
+
+// Şimdilik varsayılan bir tip tanımlayalım:
+using Serial = Uart<9600>; 
+
+ISR(USART_UDRE_vect) {
+    Serial::handleTxInterrupt();
+}
+
+ISR(USART_RX_vect) {
+    Serial::handleRxInterrupt();
+}
+
+#endif

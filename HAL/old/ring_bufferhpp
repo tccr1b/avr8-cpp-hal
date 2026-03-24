@@ -1,0 +1,42 @@
+#ifndef HAL_UTILS_RINGBUFFER_HPP
+#define HAL_UTILS_RINGBUFFER_HPP
+
+#include <stdint.h>
+
+namespace HAL {
+
+    template <typename T, uint16_t Size>
+    class RingBuffer {
+    private:
+        volatile T buffer[Size];
+        volatile uint16_t head = 0;
+        volatile uint16_t tail = 0;
+
+    public:
+        // Veri Ekle (Tampon doluysa false döner)
+        bool push(T item) {
+            uint16_t next = (head + 1) % Size;
+            if (next == tail) return false; // Dolu
+            
+            buffer[head] = item;
+            head = next;
+            return true;
+        }
+
+        // Veri Çek (Tampon boşsa false döner)
+        bool pop(T& item) {
+            if (head == tail) return false; // Boş
+            
+            item = buffer[tail];
+            tail = (tail + 1) % Size;
+            return true;
+        }
+
+        bool isEmpty() const { return head == tail; }
+        bool isFull() const { return ((head + 1) % Size) == tail; }
+        constexpr bool isEmpty() const { return head == tail; }
+        constexpr bool isFull() const { return ((head + 1) % Size) == tail; }
+    };
+}
+
+#endif
