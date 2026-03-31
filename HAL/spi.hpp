@@ -17,7 +17,11 @@ MyProject/
 #include <inttypes.h>
 #include "registers.hpp"
 #include "gpio.hpp"
+#include "utils/ring_buffer.hpp"
 #include <avr/interrupt.h>
+
+#define TX_BUFFER_SIZE 32
+#define RX_BUFFER_SIZE 32
 
 using namespace mcu;
 
@@ -61,7 +65,10 @@ namespace Peripherals{
 class Spi{
 private:
     using Callback = void(*)();
-    static inline Callback interruptCallback = nullptr;
+    inline static Callback interruptCallback = nullptr;
+    inline static HAL::RingBuffer<uint8_t, TX_BUFFER_SIZE> txBuffer;
+    inline static HAL::RingBuffer<uint8_t, RX_BUFFER_SIZE> rxBuffer;
+
     static void setClockPolarity(SpiClockPolarity clkPolarity){
         if(static_cast<bool>(clkPolarity)){
             Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_CPOL);
@@ -76,12 +83,14 @@ private:
             Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_CPHA);
         }
     }
-
+    inline static bool isBusy(){
+        return !Regs::Spi::SpiStatusReg.readBit(RegBits::Spi::SPSR_SPIF);
+    }
 public:
     static void attachInterrupt(Callback cbFunc){interruptCallback = cbFunc;}
     static void detachInterrupt(){interruptCallback = nullptr;}
     /* For ISR, do not use.*/
-    static void interruptHandler(){if(interruptCallback) interruptCallback();}
+    inline static void interruptHandler(){if(interruptCallback) interruptCallback();}
     static void init(SpiClockSpeed speed = SpiClockSpeed::dividedBy64, 
                      SpiMode spiMode = SpiMode::Master,
                      SpiDataMode spiDataMode = SpiDataMode::Mode0){
@@ -126,7 +135,7 @@ public:
     }
     static uint8_t transfer(uint8_t data){
         Regs::Spi::SpiDataReg.setValue(data);
-        while (!Regs::Spi::SpiStatusReg.readBit(RegBits::Spi::SPSR_SPIF)){}
+        while (Spi::isBusy()){}
         return Regs::Spi::SpiDataReg;
     }
     static void setDataOrder(SpiDataOrder dataOrder){
@@ -162,7 +171,14 @@ public:
     }
     static void enableSpiInterrupt(){Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPIE);}
     static void disableSpiInterrupt(){Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_SPIE);}
+/* interrupt driven?*/
+    static inline uint8_t transferByte(uint8_t data){
+//        uint8_t incomingData = mcu::Regs::Spi::SpiDataReg;
+        rxBuffer.push(mcu::Regs::Spi::SpiDataReg);
+        while(txBuffer.isFull()){}
+        txBuffer.push(data);
 
+    }
 };
 } // namespace Peripherals
 } // namespace mcu
