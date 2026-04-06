@@ -22,7 +22,9 @@ constexpr unsigned long long operator""ms(unsigned long long ms) {
 
 /* Frequency units*/
 //constexpr unsigned long long operator""MHz(unsigned long long MHz){}
-//constexpr unsigned long long operator""kHz(unsigned long long kHz){}
+constexpr unsigned long long operator""kHz(unsigned long long kHz){
+    return 1000*kHz;
+}
 constexpr unsigned long long operator""Hz(unsigned long long Hz) {
     // Frekans hesabı (CTC Modu için)
     return (F_CPU / 256) / Hz;

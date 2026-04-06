@@ -15,11 +15,16 @@ using namespace mcu;
 class AtomicBlock{
 private:
     uint8_t storedStatusReg;
+    
 public:
+    /* Kopyalamayı ve Nesne üretimini iptal et*/
+    AtomicBlock(const AtomicBlock&) = delete;
+    AtomicBlock& operator=(const AtomicBlock&) = delete;
+
     /* Constuctor*/
-    AtomicBlock();
+    inline AtomicBlock();
     /* Destructor*/
-    ~AtomicBlock();
+    inline ~AtomicBlock();
 };
 AtomicBlock::AtomicBlock(){
     storedStatusReg = Regs::Core::StatusReg;

@@ -225,14 +225,6 @@ namespace mcu {
                 constexpr IoRegister<rTWBR>  TwiBitrateReg= {};
         }
         namespace Core{
-            /*ASSR – Asynchronous Status Register
-            |    –    |  EXCLK  |  AS2  | TCN2UB | OCR2AUB | OCR2BUB | TCR2AUB | TCR2BUB |
-            If a write is performed to any of the five Timer/Counter2 registers while its update busy flag is set, the updated value might
-get corrupted and cause an unintentional interrupt to occur.
-The mechanisms for reading TCNT2, OCR2A, OCR2B, TCCR2A and TCCR2B are different. When reading TCNT2, the
-actual timer value is read. When reading OCR2A, OCR2B, TCCR2A and TCCR2B the value in the temporary storage
-register is read.*/
-            constexpr IoRegister<rASSR>   AsynchronousStatusReg= {};
             /*PCMSK2 – Pin Change Mask Register 2
             | PCINT23 | PCINT22 | PCINT21 | PCINT20 | PCINT19 | PCINT18 | PCINT17 | PCINT16 |
             Each PCINT23..16-bit selects whether pin change interrupt is enabled on the corresponding I/O pin. If PCINT23..16 is set
@@ -379,6 +371,15 @@ are listed in the Section 17.11 “Register Description” on page 127.
 The PRTIM2 bit in Section 9.10 “Minimizing Power Consumption” on page 36 must be written to zero to enable
 Timer/Counter2 module.*/
             namespace Timer2{
+                /*ASSR – Asynchronous Status Register
+                |    –    |  EXCLK  |  AS2  | TCN2UB | OCR2AUB | OCR2BUB | TCR2AUB | TCR2BUB |
+                If a write is performed to any of the five Timer/Counter2 registers while its update busy flag is set, the updated value might
+get corrupted and cause an unintentional interrupt to occur.
+The mechanisms for reading TCNT2, OCR2A, OCR2B, TCCR2A and TCCR2B are different. When reading TCNT2, the
+actual timer value is read. When reading OCR2A, OCR2B, TCCR2A and TCCR2B the value in the temporary storage
+register is read.*/
+                constexpr IoRegister<rASSR>   AsynchronousStatusReg= {};
+
                 /*OCR2B – Output Compare Register B
                 The output compare register B contains an 8-bit value that is continuously compared with the counter value (TCNT2). A
 match can be used to generate an output compare interrupt, or to generate a waveform output on the OC2B pin.*/
@@ -956,47 +957,6 @@ independent of prescaler setting. This approach is used in this datasheet, unles
             constexpr uint8_t TWSR_TWS7   = (1 << TWS7);
         }
         namespace Core{
-            /* ASSR REG BITS */
-            /*Bit 0 – TCR2BUB: Timer/Counter Control Register2 Update Busy
-When Timer/Counter2 operates asynchronously and TCCR2B is written, this bit becomes set. When TCCR2B has been
-updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that TCCR2B
-is ready to be updated with a new value.
-If a write is performed to any of the five Timer/Counter2 registers while its update busy flag is set, the updated value might
-get corrupted and cause an unintentional interrupt to occur.
-The mechanisms for reading TCNT2, OCR2A, OCR2B, TCCR2A and TCCR2B are different. When reading TCNT2, the
-actual timer value is read. When reading OCR2A, OCR2B, TCCR2A and TCCR2B the value in the temporary storage
-register is read.*/
-            constexpr uint8_t ASSR_TCR2BUB = (1 << TCR2BUB);
-            /*Bit 1 – TCR2AUB: Timer/Counter Control Register2 Update Busy
-When Timer/Counter2 operates asynchronously and TCCR2A is written, this bit becomes set. When TCCR2A has been
-updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that TCCR2A
-is ready to be updated with a new value.*/
-            constexpr uint8_t ASSR_TCR2AUB = (1 << TCR2AUB);
-            /*Bit 2 – OCR2BUB: Output Compare Register2 Update Busy
-When Timer/Counter2 operates asynchronously and OCR2B is written, this bit becomes set. When OCR2B has been
-updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that OCR2B is
-ready to be updated with a new value.*/
-            constexpr uint8_t ASSR_OCR2BUB = (1 << OCR2BUB);
-            /*Bit 3 – OCR2AUB: Output Compare Register2 Update Busy
-When Timer/Counter2 operates asynchronously and OCR2A is written, this bit becomes set. When OCR2A has been
-updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that OCR2A is
-ready to be updated with a new value.*/
-            constexpr uint8_t ASSR_OCR2AUB = (1 << OCR2AUB);
-            /*Bit 4 – TCN2UB: Timer/Counter2 Update Busy
-When Timer/Counter2 operates asynchronously and TCNT2 is written, this bit becomes set. When TCNT2 has been
-updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that TCNT2 is
-ready to be updated with a new value.*/
-            constexpr uint8_t ASSR_TCN2UB  = (1 << TCN2UB);
-            /*Bit 5 – AS2: Asynchronous Timer/Counter2
-When AS2 is written to zero, Timer/Counter2 is clocked from the I/O clock, clkI/O. When AS2 is written to one,
-Timer/Counter2 is clocked from a crystal oscillator connected to the timer oscillator 1 (TOSC1) pin. When the value of AS2 is
-changed, the contents of TCNT2, OCR2A, OCR2B, TCCR2A and TCCR2B might be corrupted.*/
-            constexpr uint8_t ASSR_AS2     = (1 << AS2);
-            /*Bit 6 – EXCLK: Enable External Clock Input
-When EXCLK is written to one, and asynchronous clock is selected, the external clock input buffer is enabled and an
-external clock can be input on timer oscillator 1 (TOSC1) pin instead of a 32kHz crystal. Writing to EXCLK should be done
-before asynchronous operation is selected. Note that the crystal oscillator will only run when this bit is zero.*/
-            constexpr uint8_t ASSR_EXCLK   = (1 << EXCLK);
 
             /* DIDR1 REG BITS */
             /*Bit 1, 0 – AIN1D, AIN0D: AIN1, AIN0 Digital Input Disable
@@ -1686,6 +1646,48 @@ the interrupt routine is executed. Alternatively, the flag can be cleared by wri
         }
         namespace Timers{
             namespace Timer2{
+            /* ASSR REG BITS */
+            /*Bit 0 – TCR2BUB: Timer/Counter Control Register2 Update Busy
+When Timer/Counter2 operates asynchronously and TCCR2B is written, this bit becomes set. When TCCR2B has been
+updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that TCCR2B
+is ready to be updated with a new value.
+If a write is performed to any of the five Timer/Counter2 registers while its update busy flag is set, the updated value might
+get corrupted and cause an unintentional interrupt to occur.
+The mechanisms for reading TCNT2, OCR2A, OCR2B, TCCR2A and TCCR2B are different. When reading TCNT2, the
+actual timer value is read. When reading OCR2A, OCR2B, TCCR2A and TCCR2B the value in the temporary storage
+register is read.*/
+                constexpr uint8_t ASSR_TCR2BUB = (1 << TCR2BUB);
+            /*Bit 1 – TCR2AUB: Timer/Counter Control Register2 Update Busy
+When Timer/Counter2 operates asynchronously and TCCR2A is written, this bit becomes set. When TCCR2A has been
+updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that TCCR2A
+is ready to be updated with a new value.*/
+                constexpr uint8_t ASSR_TCR2AUB = (1 << TCR2AUB);
+            /*Bit 2 – OCR2BUB: Output Compare Register2 Update Busy
+When Timer/Counter2 operates asynchronously and OCR2B is written, this bit becomes set. When OCR2B has been
+updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that OCR2B is
+ready to be updated with a new value.*/
+                constexpr uint8_t ASSR_OCR2BUB = (1 << OCR2BUB);
+            /*Bit 3 – OCR2AUB: Output Compare Register2 Update Busy
+When Timer/Counter2 operates asynchronously and OCR2A is written, this bit becomes set. When OCR2A has been
+updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that OCR2A is
+ready to be updated with a new value.*/
+                constexpr uint8_t ASSR_OCR2AUB = (1 << OCR2AUB);
+            /*Bit 4 – TCN2UB: Timer/Counter2 Update Busy
+When Timer/Counter2 operates asynchronously and TCNT2 is written, this bit becomes set. When TCNT2 has been
+updated from the temporary storage register, this bit is cleared by hardware. A logical zero in this bit indicates that TCNT2 is
+ready to be updated with a new value.*/
+                constexpr uint8_t ASSR_TCN2UB  = (1 << TCN2UB);
+            /*Bit 5 – AS2: Asynchronous Timer/Counter2
+When AS2 is written to zero, Timer/Counter2 is clocked from the I/O clock, clkI/O. When AS2 is written to one,
+Timer/Counter2 is clocked from a crystal oscillator connected to the timer oscillator 1 (TOSC1) pin. When the value of AS2 is
+changed, the contents of TCNT2, OCR2A, OCR2B, TCCR2A and TCCR2B might be corrupted.*/
+                constexpr uint8_t ASSR_AS2     = (1 << AS2);
+            /*Bit 6 – EXCLK: Enable External Clock Input
+When EXCLK is written to one, and asynchronous clock is selected, the external clock input buffer is enabled and an
+external clock can be input on timer oscillator 1 (TOSC1) pin instead of a 32kHz crystal. Writing to EXCLK should be done
+before asynchronous operation is selected. Note that the crystal oscillator will only run when this bit is zero.*/
+                constexpr uint8_t ASSR_EXCLK   = (1 << EXCLK);
+
                 /* TCCR2B */
                 /*Bit 2:0 – CS22:0: Clock Select
 The three clock select bits select the clock source to be used by the Timer/Counter, see Table 17-9.*/

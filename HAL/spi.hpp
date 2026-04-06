@@ -87,12 +87,25 @@ private:
         return !Regs::Spi::SpiStatusReg.readBit(RegBits::Spi::SPSR_SPIF);
     }
 public:
+    inline static bool isEnabled(){
+        return Regs::Spi::SpiControlReg.readBit(RegBits::Spi::SPCR_SPE) && 
+               !Regs::Core::PowerReductionReg.readBit(RegBits::Core::PRR_PRSPI);
+    }
+    inline static void disable(){
+        Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_SPE);
+    }
+    inline static void enable(){
+        /* Disable power reduction for SPI*/
+        mcu::Regs::Core::PowerReductionReg.clearBitmask(RegBits::Core::PRR_PRSPI);
+        /* Enable SPI*/
+        Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPE);
+    }
     static void attachInterrupt(Callback cbFunc){interruptCallback = cbFunc;}
     static void detachInterrupt(){interruptCallback = nullptr;}
     /* For ISR, do not use.*/
     inline static void interruptHandler(){if(interruptCallback) interruptCallback();}
-    static void init(SpiClockSpeed speed = SpiClockSpeed::dividedBy64, 
-                     SpiMode spiMode = SpiMode::Master,
+    static void init(SpiMode spiMode = SpiMode::Master,
+                     SpiClockSpeed speed = SpiClockSpeed::dividedBy64,
                      SpiDataMode spiDataMode = SpiDataMode::Mode0){
         switch (spiMode){
         case SpiMode::Slave:
@@ -101,23 +114,16 @@ public:
             mcu::Gpio::PinMOSI::setPinMode(HAL::PinMode::Input);
             mcu::Gpio::PinSCK::setPinMode(HAL::PinMode::Input);
             mcu::Gpio::PinSS::setPinMode(HAL::PinMode::Input);
-
-            /* SPI modülünü Slave olarak ayarla*/
-            setSpiMode(spiMode);
-
-            /* SPI modülünü etkinleştir*/
-            Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPE);
             break;
         case SpiMode::Master:
+            /* Configure SPI pins for master mode. Avoid configuring SS pin as input*/
             mcu::Gpio::PinMISO::setPinMode(HAL::PinMode::Input);
             mcu::Gpio::PinMOSI::setPinMode(HAL::PinMode::Output);
             mcu::Gpio::PinSCK::setPinMode(HAL::PinMode::Output);
 
-            /* If SS is configured as an output, the pin is a general output pin which does not affect the SPI system.*/
+            /* If SS is configured as an output, the pin is a general output pin which 
+            does not affect the SPI system.*/
             mcu::Gpio::PinSS::setPinMode(HAL::PinMode::Output);
-
-            /* SPI modülünü Master olarak ayarla*/
-            Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_MSTR);
 
             uint8_t speedMask = static_cast<uint8_t>(speed);
             if(speedMask & 0x04){
@@ -128,10 +134,17 @@ public:
                 Regs::Spi::SpiStatusReg.clearBitmask(RegBits::Spi::SPSR_SPI2X);
                 Regs::Spi::SpiControlReg.writeBitmask((0xFF << 2) | speedMask);
             }
-            //SPI modülünü etkinleştir
-            Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPE);
             break;
         }
+
+        /* SPI modülünü Slave veya Master olarak ayarla*/
+        setSpiMode(spiMode);
+
+        /* SPI data modunu ayarla*/
+        setDataMode(spiDataMode);
+
+        /* SPI modülünü etkinleştir*/
+        enable();
     }
     static uint8_t transfer(uint8_t data){
         Regs::Spi::SpiDataReg.setValue(data);
@@ -159,15 +172,10 @@ public:
     static void setSpiMode(SpiMode spiMode){
         static_cast<uint8_t>(spiMode) ? Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_MSTR): 
                                         Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_MSTR);
-
-        switch (spiMode){
-        case SpiMode::Slave:  init(SpiClockSpeed::dividedBy64, SpiMode::Slave); break;
-        case SpiMode::Master: init(SpiClockSpeed::dividedBy64, SpiMode::Master); break;
-        }
     }
     static void setDataMode(SpiDataMode dataMode){
-        constexpr uint8_t bitmask_sprc_data_mode_bits = ~(RegBits::Spi::SPCR_CPHA | RegBits::Spi::SPCR_CPOL);
-        Regs::Spi::SpiControlReg.writeMasked(static_cast<uint8_t>(dataMode), bitmask_sprc_data_mode_bits);
+        constexpr uint8_t bitmask_spcr_data_mode_bits = ~(RegBits::Spi::SPCR_CPHA | RegBits::Spi::SPCR_CPOL);
+        Regs::Spi::SpiControlReg.writeMasked(static_cast<uint8_t>(dataMode), bitmask_spcr_data_mode_bits);
     }
     static void enableSpiInterrupt(){Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPIE);}
     static void disableSpiInterrupt(){Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_SPIE);}

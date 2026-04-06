@@ -42,7 +42,6 @@ enum class Peripheral: uint8_t{
               RegBits::Core::PRR_PRTIM1| RegBits::Core::PRR_PRTIM2| RegBits::Core::PRR_PRTWI |
               RegBits::Core::PRR_PRUSART0,
 };
-
 enum class InterruptSense : uint8_t{
     IRQonLowLevel         = 0x00, //Generate interrupt request on the low level of INTx
     IRQonAnyLogicalChange = 0x01, //Generate interrupt request on any logical change of INTx
@@ -85,7 +84,10 @@ void printSystemInfo() {
 class Sleep{
     public:
         static void setMode(SleepMode sleepMode){
-            mcu::Regs::Core::SleepModeControlReg.writeMasked(static_cast<uint8_t>(sleepMode), BITMASK_SLEEPMODE);
+            constexpr static uint8_t bitmask_smcr_sleep_bits = ~(RegBits::Core::SMCR_SM2|
+                                                                 RegBits::Core::SMCR_SM1|
+                                                                 RegBits::Core::SMCR_SM0);
+            mcu::Regs::Core::SleepModeControlReg.writeMasked(static_cast<uint8_t>(sleepMode), bitmask_smcr_sleep_bits);
         }
         static SleepMode getMode(){
             return static_cast<SleepMode>(~BITMASK_SLEEPMODE & Regs::Core::SleepModeControlReg.getValue());
@@ -236,5 +238,13 @@ public:
 
 } //namespace System
 } //namespace mcu
+
+namespace mcu{
+namespace System{
+    void delayUs(uint16_t){/* Some delay functions*/};
+    void delayMs(uint16_t){/* Some delay functions*/};
+} // namespace System
+} // namespace mcu
+
 
 #endif //SYS_CTRL_HPP

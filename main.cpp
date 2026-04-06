@@ -12,6 +12,7 @@
 //#include "HAL/twi.hpp"
 //#include "HAL/utils.hpp"
 //#include "HAL/eeprom.hpp"
+#include "HAL/timers.hpp"
 
 using namespace mcu;
 using namespace HAL;
@@ -35,10 +36,22 @@ void sysReset(){
 }
 
 
-int main (){
+int main (){    
     mcu::System::captureResetReason();
     mcu::System::WatchdogTimer::disable();
-    
+    mcu::Timers::Timer1::setMode(Timers::Timer1::Mode::FastPWM_WithICR);
+    mcu::Timers::Timer1::enableNoiseCanceller();
+    mcu::Timers::Timer1::setCompareValueA(127);
+    mcu::Timers::Timer1::setClock(Timers::Timer1::Clock::NoPrescaling);
+    mcu::Timers::Timer2::selectClockSource(Timers::Timer2::ClockSource::ExternalAsync);
+    mcu::Timers::Timer2::setCompareValueA(127);
+    mcu::Timers::Timer2::enableInterrupt(Timers::Timer2::InterruptType::OutputCompareMatchA);
+    mcu::Timers::Timer2::setMode(Timers::Timer2::Mode::FastPWM_WithOCR);
+    using timer2 = mcu::Timers::Timer2;
+    timer2::init(timer2::Mode::FastPWM_WithOCR, timer2::Clock::NoPrescaling, timer2::ClockSource::InternalSync);
+    timer2::setCompareValueA(64);
+    timer2::enable();
+
     mcu::System::Clock::setClockPrescaler(Prescaler::NoDivision);
     _delay_ms(10);
     mcu::Peripherals::Usart::init(UsartMode::Asynchronous,
