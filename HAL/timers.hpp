@@ -560,10 +560,15 @@ f.Enable interrupts, if needed.
             
         };
         static void setMode(Timer2::Mode timerMode){
-            constexpr uint8_t bitmask_tccrb_mode_bit = ~(RegBits::Timers::Timer2::TCCR2B_CS22|
-                                                         RegBits::Timers::Timer2::TCCR2B_CS21|
-                                                         RegBits::Timers::Timer2::TCCR2B_CS20);
-            mcu::Regs::Timers::Timer2::TimerCounterControlRegB.writeMasked(static_cast<uint8_t>(timerMode), bitmask_tccrb_mode_bit);
+            /* TCCR2A    :|-|-|-|-|-|-|WGM21|WGM20|*/
+            constexpr uint8_t bitmask_tccra_mode_bits = ~(RegBits::Timers::Timer2::TCCR2A_WGM20|
+                                                          RegBits::Timers::Timer2::TCCR2A_WGM21);
+            /* TCCR2B    :|-|-|-|-|WGM22|-|-|-|*/
+            constexpr uint8_t bitmask_tccrb_mode_bits = ~(RegBits::Timers::Timer2::TCCR2B_WGM22);
+            /* TCCR2(A+B):|-|-|-|-|WGM22|-|WGM21|WGM20|*/
+            Regs::Timers::Timer2::TimerCounterControlRegA.writeMasked(static_cast<uint8_t>(timerMode), bitmask_tccra_mode_bits);
+            Regs::Timers::Timer2::TimerCounterControlRegB.writeMasked(static_cast<uint8_t>(timerMode), bitmask_tccrb_mode_bits);
+            
             if(ClockSource::SystemClock != getClockSource()){
                 while(Regs::Timers::Timer2::AsynchronousStatusReg.readBit(RegBits::Timers::Timer2::ASSR_TCR2BUB));
             }
@@ -628,17 +633,10 @@ f.Enable interrupts, if needed.
         }
         static void attachInterrupt(InterruptType intType, Callback callbackFunc){
             switch (intType){
-            case InterruptType::Overflow:
-                overflowCallback = callbackFunc;
-                break;
-            case InterruptType::OutputCompareMatchA:
-                compareMatchACallback = callbackFunc;
-                break;
-            case InterruptType::OutputCompareMatchB:
-                compareMatchBCallback = callbackFunc;
-                break;
-            case InterruptType::All:
-                break;
+            case InterruptType::Overflow           :overflowCallback      = callbackFunc; break;
+            case InterruptType::OutputCompareMatchA:compareMatchACallback = callbackFunc; break;
+            case InterruptType::OutputCompareMatchB:compareMatchBCallback = callbackFunc; break;
+            case InterruptType::All:break;
             }
             enableInterrupt(intType);
         }
