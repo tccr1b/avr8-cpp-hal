@@ -205,6 +205,7 @@ using PinPB7    = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_7>;
 using PinCLKO   = PinPB0; using PinICP1   = PinPB0; using PinOC1A   = PinPB1;
 using PinOC1B   = PinPB2; using PinSS     = PinPB2; using PinMOSI   = PinPB3;
 using PinOC2A   = PinPB3; using PinMISO   = PinPB4; using PinSCK    = PinPB5;
+using PinTOSC1  = PinPB6; using PinTOSC2  = PinPB7;
 
 /* PORTC PINS*/
 using PinPC0    = HAL::GpioPin<GpioPortC, RegBits::Gpio::PortC::PC_0>;

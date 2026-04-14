@@ -43,14 +43,16 @@ int main (){
     mcu::Timers::Timer1::enableNoiseCanceller();
     mcu::Timers::Timer1::setCompareValueA(127);
     mcu::Timers::Timer1::setClock(Timers::Timer1::Clock::NoPrescaling);
-    mcu::Timers::Timer2::selectClockSource(Timers::Timer2::ClockSource::ExternalAsync);
+    mcu::Timers::Timer2::selectClockSource(Timers::Timer2::ClockSource::ExternalCrystal);
     mcu::Timers::Timer2::setCompareValueA(127);
     mcu::Timers::Timer2::enableInterrupt(Timers::Timer2::InterruptType::OutputCompareMatchA);
     mcu::Timers::Timer2::setMode(Timers::Timer2::Mode::FastPWM_WithOCR);
     using timer2 = mcu::Timers::Timer2;
-    timer2::init(timer2::Mode::FastPWM_WithOCR, timer2::Clock::NoPrescaling, timer2::ClockSource::InternalSync);
+    timer2::init(timer2::Mode::FastPWM_WithOCR, timer2::Clock::NoPrescaling, timer2::ClockSource::SystemClock);
     timer2::setCompareValueA(64);
     timer2::enable();
+    timer2::disable();
+    timer2::selectClockSource(timer2::ClockSource::ExternalClock);
 
     mcu::System::Clock::setClockPrescaler(Prescaler::NoDivision);
     _delay_ms(10);
