@@ -7,11 +7,13 @@
 #define RX_BUFFER_SIZE 64   //Byte (uint8_t)
 
 #include "registers.hpp"
-#include "utils/ring_buffer.hpp"
 #include "sysctrl.hpp"
+#include "utils/ring_buffer.hpp"
+#include "HAL/gpio.hpp"
 #include <math.h>
 
 using namespace mcu;
+using namespace HAL;
 
 enum class UsartBaudrate    : uint32_t{
     _2400bps   = 2400,
@@ -234,7 +236,8 @@ private:
         /* Apply mode*/
         mcu::Regs::Uart::UartControlAndStatusRegC.writeMasked(static_cast<uint8_t>(spiMode), bitmask_mspim_mode);
     }
-public:
+
+    public:
     static void handleTxInterrupt(){
         uint8_t data;
         if(txBuffer.pop(data)){
@@ -325,7 +328,7 @@ public:
         Regs::Uart::UartControlAndStatusRegB.setBitmask(RegBits::Uart::UCSR0B_RXEN0);
     }
     static void disableReceiver(){
-        Regs::Uart::UartControlAndStatusRegB.clearBitmask(RegBits::Uart::UCSR0B_RXEN0);
+        mcu::Regs::Uart::UartControlAndStatusRegB.clearBitmask(RegBits::Uart::UCSR0B_RXEN0);
         /* Config. rx pin Hi-Z. (not necessary)*/
         mcu::Gpio::PinRXD::setPinMode(PinMode::HighImpedance);
     }
@@ -345,7 +348,7 @@ public:
                      UsartStopBits   stopBit     = UsartStopBits::One, 
                      UsartParityMode parityMode  = UsartParityMode::Disabled){
         /* Activate usart0 in power reduction reg.*/
-        System::Power::activatePeripheral(Peripheral::Usart0);
+        mcu::System::Power::activatePeripheral(Peripheral::Usart0);
 
         /* Usart çalışma ayarı*/
         setUsartMode(usartMode);

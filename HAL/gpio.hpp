@@ -103,7 +103,8 @@ using anyPin = HAL::GpioPin<anyPort, RegBits::Gpio::PortX::PB_n>;
 
         static inline void setHigh()    {gpioPORT::PortReg().setBitmask(pinPosBitmask);}
         static inline void setLow()     {gpioPORT::PortReg().clearBitmask(pinPosBitmask);}
-        static inline void toggleState(){gpioPORT::PortReg().toggleBitmask(pinPosBitmask);}
+//        static inline void toggle()     {gpioPORT::PortReg().toggleBitmask(pinPosBitmask);}
+        static inline void toggle()    {gpioPORT::InputReg().setValue(pinPosBitmask);}
         static inline bool readPin()    {__asm__("nop"); return gpioPORT::InputReg().readBit(pinPosBitmask);}
 };
 

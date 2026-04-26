@@ -21,6 +21,8 @@ using builtInLED = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_5>;
 
 using internalLed = mcu::Gpio::PinPB5;
 
+using togglingPin = mcu::Gpio::PinPB1;
+
 /* Nokia 5110 Display*/
 using pinSCK_Lcd5110  = mcu::Gpio::PinPB4;
 using pinMOSI_Lcd5110 = mcu::Gpio::PinPB0;

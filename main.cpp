@@ -5,7 +5,7 @@
 #include <avr/interrupt.h>
 #include "board.hpp"
 #include "HAL/watchdog.hpp"
-#include "HAL/sysctrl.hpp"
+//#include "HAL/sysctrl.hpp"
 #include "HAL/serialstream.hpp"
 //#include "HAL/spi.hpp"
 //#include "HAL/adc.hpp"
@@ -19,7 +19,7 @@ using namespace HAL;
 
 void sysReset(){
     static uint8_t resetCount = 0;
-    builtInLED::toggleState();
+    builtInLED::toggle();
     cstd::cout << "WatchdogTimer did not stop! " << resetCount++ << cstd::endl;
     if(resetCount >= 11){ 
         mcu::System::WatchdogTimer::setMode(WatchdogMode::InterruptAndSystemReset);
@@ -32,29 +32,14 @@ void sysReset(){
     mcu::System::WatchdogTimer::setMode(WatchdogMode::Interrupt);
     cstd::cout << "System reset disabled..." << cstd::endl;
     cstd::cout << cstd::endl;
-    builtInLED::toggleState();
+    builtInLED::toggle();
 }
 
 
 int main (){    
-    mcu::System::captureResetReason();
-    mcu::System::WatchdogTimer::disable();
-    mcu::Timers::Timer1::setMode(Timers::Timer1::Mode::FastPWM_WithICR);
-    mcu::Timers::Timer1::enableNoiseCanceller();
-    mcu::Timers::Timer1::setCompareValueA(127);
-    mcu::Timers::Timer1::setClock(Timers::Timer1::Clock::NoPrescaling);
-    mcu::Timers::Timer2::selectClockSource(Timers::Timer2::ClockSource::ExternalCrystal);
-    mcu::Timers::Timer2::setCompareValueA(127);
-    mcu::Timers::Timer2::enableInterrupt(Timers::Timer2::InterruptType::OutputCompareMatchA);
-    mcu::Timers::Timer2::setMode(Timers::Timer2::Mode::FastPWM_WithOCR);
-    using timer2 = mcu::Timers::Timer2;
-    timer2::init(timer2::Mode::FastPWM_WithOCR, timer2::Clock::NoPrescaling, timer2::ClockSource::SystemClock);
-    timer2::setCompareValueA(64);
-    timer2::enable();
-    timer2::disable();
-    timer2::selectClockSource(timer2::ClockSource::ExternalClock);
 
     mcu::System::Clock::setClockPrescaler(Prescaler::NoDivision);
+
     _delay_ms(10);
     mcu::Peripherals::Usart::init(UsartMode::Asynchronous,
                                   UsartBaudrate::_9600bps,
@@ -65,23 +50,37 @@ int main (){
     mcu::System::WatchdogTimer::attachInterrupt(sysReset);
     mcu::System::WatchdogTimer::enable(WatchdogMode::InterruptAndSystemReset, WatchdogTimeout::_4sec);
     sei();
+    mcu::System::WatchdogTimer::disable();
+
+    togglingPin::setPinMode(HAL::PinMode::Output);
+
+    // FASTPWM_WITHOCR
+//    using t0 = mcu::Timers::Timer0;
+//    t0::init(t0::Mode::FastPWM_WithOCR, t0::Clock::NoPrescaling);
+//    t0::enableOutputComparePinB();
+//    t0::enableOutputComparePinA();
+//    t0::setOutputModePinA(t0::OutputMode::TogglePinOnCompareMatch);
+//    t0::setOutputModePinB(t0::OutputMode::ClearPinOnCompareMatch);
+//    t0::setCompareValueA(200);
+//    t0::setCompareValueB(0);
+
+    // FASTPWM
+//    t0::init(t0::Mode::FastPWM, t0::Clock::NoPrescaling);
+//    t0::enableOutputComparePinA();
+//    mcu::Timers::Timer0::setOutputModeA(Timers::Timer0::OutputMode::ClearOnCompareMatch);    
+//    mcu::Timers::Timer0::setCompareValueA(32);
     
-    cstd::cout << "#=========== SYSTEM INFO ===========#" << cstd::endl;
-    cstd::cout << "Master Clock Source: " << mcu::System::Clock::getMasterClockSourceStr() << cstd::endl;    
-    cstd::cout << "CPU Clock Frequency: " << mcu::System::Clock::getCpuFrequency() << "Hz" << cstd::endl;
-    cstd::cout << "F_CPU Frequency    : " << (uint32_t)F_CPU << "Hz" << cstd::endl;
-    cstd::cout << "Extended Fuse Bits : " << mcu::System::Fuses::getExtendedFuseBits() << cstd::endl;
-    cstd::cout << "High Fuse Bits     : " << mcu::System::Fuses::getHighFuseBits() << cstd::endl;
-    cstd::cout << "Low Fuse Bits      : " << mcu::System::Fuses::getLowFuseBits() << cstd::endl;
-    cstd::cout << "Lock Bits          : " << mcu::System::Fuses::getLockBits() << cstd::endl;
-    cstd::cout << "BOD Enabled?       : " << mcu::System::Fuses::isBodEnabled() << cstd::endl;
-    cstd::cout << "Baudrate           : 9600bps" << cstd::endl;
-    cstd::cout << "X2 Enabled?        : " << (uint8_t)(mcu::Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_U2X0)) << cstd::endl;
-    cstd::cout << "=====================================" << cstd::endl;
-    cstd::cout << cstd::endl;
-        
-    while(1) {
+//    mcu::Timers::Timer0::setCompareValueB(32);
+    uint8_t duty = 0;
+    while(1){
 //        mcu::System::WatchdogTimer::reset();
+        /* ArduinoUnoR3Pin:9 (PB1)*/
+//        togglingPin::toggle();      //2.65MHz @16MHz
+//        t0::setCompareValueA(duty);
+        _delay_ms(1000);
+        duty++;
+//        if(duty==t0::getCompareValueA())duty=0;
+//        t0::setCompareValueB(duty);
     }
 
     return 0;

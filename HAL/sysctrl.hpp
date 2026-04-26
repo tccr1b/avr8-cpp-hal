@@ -48,10 +48,6 @@ enum class InterruptSense : uint8_t{
     IRQonFallingEdge      = 0x02, //Generate interrupt request on falling edge of INTx
     IRQonRisingEdge       = 0x03, //Generate interrupt request on rising edge of INTx
 };
-
-namespace mcu{
-namespace System{
-
 enum class ResetReason : uint8_t {
     PowerOn     = (1 << 0),
     External    = (1 << 1),
@@ -60,26 +56,8 @@ enum class ResetReason : uint8_t {
     Unknown     = 0
 };
 
-// Global veya static bir değişken
-static uint8_t lastResetFlags = 0;
-
-static void captureResetReason() {
-    lastResetFlags = Regs::Core::McuStatusReg; // MCUSR
-    Regs::Core::McuStatusReg = 0x00; // Bir sonraki reset için temizle
-}
-
-void printSystemInfo() {
-    cstd::cout << "#=========== SYSTEM INFO ===========#" << cstd::endl;
-    
-    cstd::cout << "Reset Nedeni: ";
-    if (lastResetFlags & (uint8_t)ResetReason::PowerOn)  cstd::cout << "Guc Acildi (POR)";
-    if (lastResetFlags & (uint8_t)ResetReason::External) cstd::cout << "Reset Butonu";
-    if (lastResetFlags & (uint8_t)ResetReason::Watchdog) cstd::cout << "!!! WATCHDOG RESET !!!";
-    if (lastResetFlags & (uint8_t)ResetReason::BrownOut) cstd::cout << "Dusus Gerilim (BOD)";
-    cstd::cout << cstd::endl;
-
-    // ... diğer info bilgileri
-}
+namespace mcu{
+namespace System{
 
 class Sleep{
     public:

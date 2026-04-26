@@ -135,14 +135,15 @@ namespace mcu {
             // Reset edilecek register bitlerini bitmask olarak geçin, bitMask: Reset edilecek bit pozisyonlarını içerir.*/
             inline void clearBitmask (uint8_t bitMask) const volatile {*this &= ~bitMask;}
             inline void writeBitmask(uint8_t uByte) const volatile {*this &= uByte;}
-            inline void writeMasked(uint8_t uByte,uint8_t mask) const volatile {*this &= (mask | uByte); }
+            inline void writeMasked(uint8_t uByte,uint8_t mask) const volatile {*this &= mask; *this |= uByte;}
             // 
             inline void toggleBitmask(uint8_t bitMask) const volatile {*this ^= bitMask;}
             //
             inline bool readBit  (uint8_t bitMask) const volatile {return (*this & bitMask);}
             //
             inline void setValue    (uint8_t value) const volatile {*this = value;}
-            inline uint8_t getValue() const volatile { return *this; }
+            inline uint8_t getValue() const volatile {return *this;}
+            inline uint8_t getValue(uint8_t mask) const volatile {return (*this & mask);}
             //void clearBit  (uint8_t bitPosition) const volatile {*this &= ~(1 << bitPosition);}
             //void toggleBit (uint8_t bitPosition) const volatile {*this ^= (1 << bitPosition);}
             //void readBit   (uint8_t bitPosition) const volatile {return (*this & (1 << bitPosition));}
