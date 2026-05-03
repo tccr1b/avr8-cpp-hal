@@ -19,7 +19,7 @@ using namespace HAL;
 
 void sysReset(){
     static uint8_t resetCount = 0;
-    builtInLED::toggle();
+    builtinLed::toggle();
     cstd::cout << "WatchdogTimer did not stop! " << resetCount++ << cstd::endl;
     if(resetCount >= 11){ 
         mcu::System::WatchdogTimer::setMode(WatchdogMode::InterruptAndSystemReset);
@@ -32,9 +32,12 @@ void sysReset(){
     mcu::System::WatchdogTimer::setMode(WatchdogMode::Interrupt);
     cstd::cout << "System reset disabled..." << cstd::endl;
     cstd::cout << cstd::endl;
-    builtInLED::toggle();
+    builtinLed::toggle();
 }
 
+void timerCallback(){
+    builtinLed::toggle();
+}
 
 int main (){    
 
@@ -65,20 +68,63 @@ int main (){
 //    t0::setCompareValueB(0);
 
     // FASTPWM
+//    using t0 = mcu::Timers::Timer0;
 //    t0::init(t0::Mode::FastPWM, t0::Clock::NoPrescaling);
 //    t0::enableOutputComparePinA();
-//    mcu::Timers::Timer0::setOutputModeA(Timers::Timer0::OutputMode::ClearOnCompareMatch);    
+//    mcu::Timers::Timer0::setOutputModePinA(Timers::Timer0::OutputMode::ClearPinOnCompareMatch);    
 //    mcu::Timers::Timer0::setCompareValueA(32);
-    
 //    mcu::Timers::Timer0::setCompareValueB(32);
+
+// CHANNEL DEFINED
+//    mcu::Timers::Timer0::init(Timers::Timer0::Mode::ClearTimerOnCompareMatch, Timers::Timer0::Clock::NoPrescaling);
+//    mcu::Timers::Timer0::ChannelA.enable();
+//    mcu::Timers::Timer0::ChannelA.setOutputMode(Timers::Timer0::OutputMode::TogglePinOnCompareMatch);
+//    mcu::Timers::Timer0::ChannelB.setOutputMode(Timers::Timer0::OutputMode::DisconnectedFromPin);
+//    mcu::Timers::Timer0::ChannelA.forceOutput();
+//    mcu::Timers::Timer0::setCompareValueA(32);
+//    mcu::Timers::Timer0::ChannelA.forceOutput();
+//    mcu::Timers::Timer0::Interrupts.attach(Timers::Timer0::InterruptType::Overflow, sysReset);
+//    mcu::Timers::Timer0::Interrupts.detach(Timers::Timer0::InterruptType::Overflow);
+//    mcu::Timers::Timer0::Interrupts.disable(Timers::Timer0::InterruptType::Overflow);
+//    using timer0 = mcu::Timers::Timer0;
+//    timer0::ChannelA.forceOutput();
+//    timer0::ChannelA.setOutputMode(timer0::OutputMode::DisconnectedFromPin);
+//    timer0::Interrupts.disable(timer0::InterruptType::All);
+/* TESTING TIMER0 INTERRUPTS*/
+//    using timer0 = mcu::Timers::Timer0;
+//    timer0::init(timer0::Mode::Normal, timer0::Clock::DividedBy1024);
+//    mcu::Timers::Timer0::Interrupts.attach(mcu::Timers::Timer0::InterruptType::Overflow, timerCallback);
+//    mcu::Timers::Timer0::ChannelA.setOutputMode(timer0::OutputMode::DisconnectedFromPin);
+//    timer0::ChannelA.setOutputMode(timer0::OutputMode::DisconnectedFromPin);
+    using timer0 = mcu::Timers::Timer0;
+    timer0::init(timer0::Mode::FastPWM, timer0::Clock::DividedBy1024);
+    timer0::setCompareValueA(127);
+    timer0::ChannelA.setOutputMode(timer0::OutputMode::SetPinOnCompareMatch);
+    timer0::ChannelA.enable();
+    timer0::Interrupts.attach(timer0::InterruptType::OutputCompareMatchA, timerCallback);    
+
+
+//    using t1 = mcu::Timers::Timer1;
+//    t1::init(t1::Mode::FastPWM_9bit, t1::Clock::NoPrescaling);
+//    t1::enableOutputComparePinA();
+//    t1::ChannelA.setOutputMode(t1::OutputMode::ClearOnCompareMatch);
+
     uint8_t duty = 0;
+    uint16_t duty16bit = 0;
+
+    builtinLed::setPinMode(PinMode::Output);
+    builtinLed::enableInputPullUp();
     while(1){
 //        mcu::System::WatchdogTimer::reset();
         /* ArduinoUnoR3Pin:9 (PB1)*/
 //        togglingPin::toggle();      //2.65MHz @16MHz
 //        t0::setCompareValueA(duty);
-        _delay_ms(1000);
+
+        _delay_ms(100);
         duty++;
+        duty16bit++;
+        mcu::Timers::Timer0::setCompareValueA(duty);
+//        t1::setCompareValueA(duty16bit);
 //        if(duty==t0::getCompareValueA())duty=0;
 //        t0::setCompareValueB(duty);
     }

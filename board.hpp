@@ -16,23 +16,20 @@ using builtInLED = HAL::GpioPin<decltype(Regs::Gpio::PortRegB),
                                 decltype(Regs::Gpio::InputPinAddrB),
                                 RegBits::Gpio::PortB::PB_5>;
 */
-using builtInLED = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_5>;
-
-
-using internalLed = mcu::Gpio::PinPB5;
+using builtinLed = mcu::Gpio::PinPB5;
 
 using togglingPin = mcu::Gpio::PinPB1;
 
 /* Nokia 5110 Display*/
-using pinSCK_Lcd5110  = mcu::Gpio::PinPB4;
-using pinMOSI_Lcd5110 = mcu::Gpio::PinPB0;
-using pinMISO_Lcd5110 = mcu::Gpio::PinPB2;
-using pinSS_Lcd5110   = mcu::Gpio::PinPB7;
+//using pinSCK_Lcd5110  = mcu::Gpio::PinPB4;
+//using pinMOSI_Lcd5110 = mcu::Gpio::PinPB0;
+//using pinMISO_Lcd5110 = mcu::Gpio::PinPB2;
+//using pinSS_Lcd5110   = mcu::Gpio::PinPB7;
 
 /* 16x2 LCD Display Pins*/
-using pinRW_Lcd1602 = mcu::Gpio::PinPC0;
-using pinRS_Lcd1602 = mcu::Gpio::PinPB3;
-using pinEN_Lcd1602 = mcu::Gpio::PinPD3;
+//using pinRW_Lcd1602 = mcu::Gpio::PinPC0;
+//using pinRS_Lcd1602 = mcu::Gpio::PinPB3;
+//using pinEN_Lcd1602 = mcu::Gpio::PinPD3;
 
 /* 2x16 LCD Display Pins
 const HAL::VirtualPort::PinConfig pinB0 = {Regs::Gpio::DataDirectionRegB,

@@ -1,0 +1,145 @@
+TIMER0
+private:
+        static void forceOutputCompareA(){
+            if(Regs::Timers::Timer0::TimerCounterControlRegA.readBit(RegBits::Timers::Timer0::TCCR0A_WGM00)) return;
+            Regs::Timers::Timer0::TimerCounterControlRegB.setBitmask(RegBits::Timers::Timer0::TCCR0B_FOC0A);
+        }
+        static void forceOutputCompareB(){
+            if(Regs::Timers::Timer0::TimerCounterControlRegA.readBit(RegBits::Timers::Timer0::TCCR0A_WGM00)) return;
+            Regs::Timers::Timer0::TimerCounterControlRegB.setBitmask(RegBits::Timers::Timer0::TCCR0B_FOC0B);
+        }
+        static void setOutputModePinA(Timer0::OutputMode outputMode = Timer0::OutputMode::DisconnectedFromPin){
+            /* Bitmask for output mode A*/
+            constexpr uint8_t bitmask_tccra_out_mode_bits = ~(RegBits::Timers::Timer0::TCCR0A_COM0A0| 
+                                                              RegBits::Timers::Timer0::TCCR0A_COM0A1);
+            /* Copy content of tccra register and make all the changes on copy of it*/
+            uint8_t currentTCCRA = Regs::Timers::Timer0::TimerCounterControlRegA;
+            currentTCCRA &= bitmask_tccra_out_mode_bits;
+            /* Assign new output mode to copied value*/
+            currentTCCRA |= (static_cast<uint8_t>(outputMode) << 6);
+            /*Update tccra register*/
+            Regs::Timers::Timer0::TimerCounterControlRegA.setValue(currentTCCRA);
+        };
+        static void setOutputModePinB(Timer0::OutputMode outputMode = Timer0::OutputMode::DisconnectedFromPin){
+            uint8_t currentTCCRA = Regs::Timers::Timer0::TimerCounterControlRegA;
+            currentTCCRA &= ~(RegBits::Timers::Timer0::TCCR0A_COM0B0 | RegBits::Timers::Timer0::TCCR0A_COM0B1);
+            currentTCCRA |= (static_cast<uint8_t>(outputMode) << 4);
+            Regs::Timers::Timer0::TimerCounterControlRegA.setValue(currentTCCRA);
+        }
+        static void enableOutputComparePinA(){
+            mcu::Gpio::PinOC0A::setPinMode(HAL::PinMode::Output);
+        }
+        static void enableOutputComparePinB(){
+            mcu::Gpio::PinOC0B::setPinMode(HAL::PinMode::Output);
+        }
+
+
+
+TIMER1
+        static void forcePinAOutputCompare(){
+            Regs::Timers::Timer1::TimerCounterControlRegC.setBitmask(RegBits::Timers::Timer1::TCCR1C_FOC1A);
+        }
+        static void forcePinBOutputCompare(){
+            Regs::Timers::Timer1::TimerCounterControlRegC.setBitmask(RegBits::Timers::Timer1::TCCR1C_FOC1B);
+        }
+        static void enableInterrupt(InterruptType intType){
+            Regs::Timers::Timer1::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));
+        }
+        static void disableInterrupt(InterruptType intType){
+            Regs::Timers::Timer1::TimerInterruptMaskReg.clearBitmask(static_cast<uint8_t>(intType));
+        }
+        static void attachInterrupt(InterruptType intType, Callback cbFunc){
+            switch(intType){
+                case InterruptType::InputCapture:       cbInputCaptureCallback  = cbFunc; break;
+                case InterruptType::OutputCompareMatchA:cbCompareMatchACallback = cbFunc; break;
+                case InterruptType::OutputCompareMatchB:cbCompareMatchBCallback = cbFunc; break;
+                case InterruptType::Overflow:           cbOverflowCallback      = cbFunc; break;
+            }
+            enableInterrupt(intType);
+        }
+        static void detachInterrupt(InterruptType intType){
+            switch(intType){
+                case InterruptType::InputCapture        : cbInputCaptureCallback = nullptr; break;
+                case InterruptType::OutputCompareMatchA : cbCompareMatchACallback= nullptr; break;
+                case InterruptType::OutputCompareMatchB : cbCompareMatchBCallback= nullptr; break;
+                case InterruptType::Overflow            : cbOverflowCallback     = nullptr; break;
+                case InterruptType::All                 : cbInputCaptureCallback = nullptr;
+                                                          cbCompareMatchACallback= nullptr;
+                                                          cbCompareMatchBCallback= nullptr;
+                                                          cbOverflowCallback     = nullptr; break;
+            }
+            disableInterrupt(intType);
+        }
+        static void interruptHandler(InterruptType intType){
+            switch(intType){
+                case InterruptType::InputCapture       : if(cbInputCaptureCallback) cbInputCaptureCallback(); break;
+                case InterruptType::OutputCompareMatchA: if(cbCompareMatchACallback)cbCompareMatchACallback();break;
+                case InterruptType::OutputCompareMatchB: if(cbCompareMatchBCallback)cbCompareMatchBCallback();break;
+                case InterruptType::Overflow           : if(cbOverflowCallback)     cbOverflowCallback();     break;
+            }
+        }
+
+        static void enablePinAOutputCompare(){mcu::Gpio::PinOC1A::setPinMode(PinMode::Output);}
+        static void enablePinBOutputCompare(){mcu::Gpio::PinOC1B::setPinMode(PinMode::Output);}
+
+        static void setPinAOutputMode(OutputMode output_mode){
+            constexpr uint8_t bitmask_tccra_outputmode_a_bits = ~(RegBits::Timers::Timer1::TCCR1A_COM1A0|
+                                                                  RegBits::Timers::Timer1::TCCR1A_COM1A1);
+            uint8_t mode = (static_cast<uint8_t>(output_mode) << 6);
+            Regs::Timers::Timer1::TimerCounterControlRegA.writeMasked(mode, bitmask_tccra_outputmode_a_bits);
+        }
+        static void setPinBOutputMode(OutputMode output_mode){
+            constexpr uint8_t bitmask_tccra_outputmode_b_bits = ~(RegBits::Timers::Timer1::TCCR1A_COM1B0|
+                                                                  RegBits::Timers::Timer1::TCCR1A_COM1B1);
+            uint8_t mode = (static_cast<uint8_t>(output_mode) << 4);
+            Regs::Timers::Timer1::TimerCounterControlRegA.writeMasked(mode, bitmask_tccra_outputmode_b_bits);
+        }
+
+TIMER2
+        static void enableInterrupt(InterruptType intType){
+            mcu::Regs::Timers::Timer2::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));
+        }
+        static void disableInterrupt(InterruptType intType){
+            mcu::Regs::Timers::Timer2::TimerInterruptMaskReg.clearBitmask(static_cast<uint8_t>(intType));
+        }
+        static void attachInterrupt(InterruptType intType, Callback callbackFunc){
+            if(intType == InterruptType::All) return;
+            switch (intType){
+            case InterruptType::Overflow           :cbOverflowCallback      = callbackFunc; break;
+            case InterruptType::OutputCompareMatchA:cbCompareMatchACallback = callbackFunc; break;
+            case InterruptType::OutputCompareMatchB:cbCompareMatchBCallback = callbackFunc; break;
+            }
+            enableInterrupt(intType);
+        }
+        static void detachInterrupt(InterruptType intType){
+            switch (intType){
+            case InterruptType::Overflow           :cbOverflowCallback      = nullptr; break;
+            case InterruptType::OutputCompareMatchA:cbCompareMatchACallback = nullptr; break;
+            case InterruptType::OutputCompareMatchB:cbCompareMatchBCallback = nullptr; break;
+            }
+            disableInterrupt(intType);
+        }
+        static void setOutputModePinA(OutputMode outMode = OutputMode::DisconnectedFromPin){
+            constexpr static uint8_t bitmask_tccra_cmpoutmode_bits = ~(RegBits::Timers::Timer2::TCCR2A_COM2A1|
+                                                                       RegBits::Timers::Timer2::TCCR2A_COM2A0);
+            mcu::Regs::Timers::Timer2::TimerCounterControlRegA.writeMasked((static_cast<uint8_t>(outMode) << BITPOS_COM2A),
+                                                                           bitmask_tccra_cmpoutmode_bits);
+            if(ClockSource::SystemClock != getClockSource()){
+                while(Regs::Timers::Timer2::AsynchronousStatusReg.readBit(RegBits::Timers::Timer2::ASSR_TCR2AUB));
+            }
+        }
+        static void setOutputModePinB(OutputMode outMode = OutputMode::DisconnectedFromPin){
+            constexpr static uint8_t bitmask_tccra_cmpoutmode_bits = ~(RegBits::Timers::Timer2::TCCR2A_COM2B1|
+                                                                       RegBits::Timers::Timer2::TCCR2A_COM2B0);
+            mcu::Regs::Timers::Timer2::TimerCounterControlRegA.writeMasked((static_cast<uint8_t>(outMode) << BITPOS_COM2B), 
+                                                                            bitmask_tccra_cmpoutmode_bits);
+            if(ClockSource::SystemClock != getClockSource()){
+                while(Regs::Timers::Timer2::AsynchronousStatusReg.readBit(RegBits::Timers::Timer2::ASSR_TCR2AUB));
+            }
+        }
+        static void enableOutputComparePinA(){
+            mcu::Gpio::PinOC2A::setPinMode(PinMode::Output);
+        };
+        static void enableOutputComparePinB(){
+            mcu::Gpio::PinOC2B::setPinMode(PinMode::Output);
+        };
