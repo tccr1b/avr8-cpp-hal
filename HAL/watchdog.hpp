@@ -40,9 +40,11 @@ namespace System{
             inline static WatchdogTimeout wdTimeout = WatchdogTimeout::_8sec;
             inline static WatchdogMode wdMode = WatchdogMode::SystemReset;
         public:
-            static void attachInterrupt(Callback cb){interruptCallback = cb;}
-            static void detachInterrupt(){interruptCallback = nullptr;}
-            static void handleInterrupt(){if(interruptCallback) interruptCallback();}
+            struct{
+                void attach(Callback cb){interruptCallback = cb;}
+                void detach(){interruptCallback = nullptr;}
+                void handle(){if(interruptCallback) interruptCallback();}
+            }static Interrupt;
             static void setTimeOut(WatchdogTimeout wdtTimeout){
                 /* Prepare new values for writing fast as much as possible*/
                 uint8_t newTimeoutValue = RegBits::Core::WDTCSR_WDE | static_cast<uint8_t>(wdtTimeout);
@@ -131,6 +133,6 @@ namespace System{
 } //namespace mcu
 
 // Interrupt Service Routine for Watchdog
-ISR(WDT_vect){mcu::System::WatchdogTimer::handleInterrupt();}
+ISR(WDT_vect){mcu::System::WatchdogTimer::Interrupt.handle();}
 
 #endif //WATCHDOG_TIMER_HPP

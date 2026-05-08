@@ -39,6 +39,11 @@ public:
         itoa(val, buffer, 10);
         return *this << buffer;
     }
+    SerialStream& operator<<(uint16_t val){
+        char buffer[10];
+        itoa(val, buffer, 10);
+        return *this << buffer;
+    }
     // Sayı basma (Integer)
     SerialStream& operator<<(uint32_t val) {
         char buffer[12]; // 32-bit unsigned long için 10 hane + sign/null yeterlidir

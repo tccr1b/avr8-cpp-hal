@@ -1,4 +1,6 @@
-
+/* TODO
+    Synchronize Timer clockings
+*/
 #ifndef TIMERS_HPP
 #define TIMERS_HPP
 
@@ -38,10 +40,11 @@
 #define BITPOS_FOC2A FOC2A
 #define BITPOS_FOC2B FOC2B
 
+#include <avr/interrupt.h>
+
 #include "registers.hpp"
 #include "HAL/sysctrl.hpp"
 #include "gpio.hpp"
-#include <avr/interrupt.h>
 #include "HAL/utils/atomicblock.hpp"
 
 using namespace mcu;
@@ -139,7 +142,10 @@ namespace Timers{
                     mcu::Regs::Timers::Timer0::TimerCounterControlRegB.setBitmask(1 << focBitPos);
                 }
             };
-        struct TimerInterrupt{
+    public:
+        static OCPin<Gpio::PinOC0A, BITPOS_COM0A, BITPOS_FOC0A> ChannelA;
+        static OCPin<Gpio::PinOC0B, BITPOS_COM0B, BITPOS_FOC0B> ChannelB;
+        struct{ //Interrupts
             void enable(InterruptType intType){
                 Regs::Timers::Timer0::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));
             }
@@ -173,17 +179,16 @@ namespace Timers{
                     case InterruptType::OutputCompareMatchB: if(compareMatchBCallback) compareMatchBCallback(); break;
                 }
             }
-        };
-    public:
-        static OCPin<Gpio::PinOC0A, BITPOS_COM0A, BITPOS_FOC0A> ChannelA;
-        static OCPin<Gpio::PinOC0B, BITPOS_COM0B, BITPOS_FOC0B> ChannelB;
-        static TimerInterrupt Interrupts;
+        }static Interrupts;
         static void disable(){
             setClock(Clock::Stopped);
         }
         static void enable(){
             mcu::System::Power::activatePeripheral(Peripheral::Timer0);
             if(currentClock != Clock::Stopped) setClock(currentClock);
+        }
+        static void clearCounter(){
+            mcu::Regs::Timers::Timer0::TimerCounterReg = 0x00;
         }
         static void setMode(Mode timerMode){
             constexpr uint8_t bitmask_tccra_mode_bits = ~(RegBits::Timers::Timer0::TCCR0A_WGM00|
@@ -249,7 +254,7 @@ namespace Timers{
         static void init(Timer0::Mode   tmrMode = Timer0::Mode::Normal, 
                          Timer0::Clock tmrClock = Timer0::Clock::DividedBy1024){
             /* Disable power reduction for timer0 */
-            mcu::Regs::Core::PowerReductionReg.clearBitmask(RegBits::Core::PRR_PRTIM0);
+            mcu::System::Power::activatePeripheral(Peripheral::Timer0);
             /* Reset registers: TCCR0A, TCCR0B, TCNT0*/
             mcu::Regs::Timers::Timer0::TimerCounterControlRegA.setValue(0x00);
             mcu::Regs::Timers::Timer0::TimerCounterControlRegB.setValue(0x00);
@@ -293,27 +298,7 @@ namespace Timers{
             return 0;
         }
     };
-/*
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-*/
+/**/
 
     class Timer1{
     public:
@@ -388,7 +373,7 @@ namespace Timers{
         inline static Callback cbCompareMatchACallback = nullptr;
         inline static Callback cbCompareMatchBCallback = nullptr;
         inline static Callback cbInputCaptureCallback  = nullptr;
-        static Clock currentClock;
+        inline static Clock currentClock;
         template<typename IOPin, uint8_t comBitPos, uint8_t focBitPos> struct OCPin{
             inline void enable(){
                 IOPin::setPinMode(HAL::PinMode::Output);
@@ -404,13 +389,13 @@ namespace Timers{
                 mcu::Regs::Timers::Timer1::TimerCounterControlRegC.setBitmask(1 << focBitPos);
             }
         };
-        struct TimerInterrupt{
-            void enable(InterruptType intType){
-                Regs::Timers::Timer1::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));
-            }
-            void disable(InterruptType intType){
-                Regs::Timers::Timer1::TimerInterruptMaskReg.clearBitmask(static_cast<uint8_t>(intType));
-            }
+
+    public:
+        static OCPin<Gpio::PinOC1A, BITPOS_COM1A, BITPOS_FOC1A> ChannelA;
+        static OCPin<Gpio::PinOC1B, BITPOS_COM1B, BITPOS_FOC1B> ChannelB;
+        struct{ //Interrupts
+            void enable(InterruptType intType){Regs::Timers::Timer1::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));}
+            void disable(InterruptType intType){Regs::Timers::Timer1::TimerInterruptMaskReg.clearBitmask(static_cast<uint8_t>(intType));}
             void attach(InterruptType intType, Callback callbackFunc){
                 if(InterruptType::All == intType) return;
                 switch (intType){
@@ -420,7 +405,7 @@ namespace Timers{
                     case InterruptType::InputCapture        :cbInputCaptureCallback  = callbackFunc; break;
                     case InterruptType::All:break;
                 }
-                enable(intType);
+                this->enable(intType);
             }
             void detach(InterruptType intType){
                 switch (intType){
@@ -432,7 +417,7 @@ namespace Timers{
                                                              cbCompareMatchACallback = nullptr;
                                                              cbCompareMatchBCallback = nullptr; break;
                 }
-                disable(intType);
+                this->disable(intType);
             }
             void handler(InterruptType intType){
                 switch (intType){
@@ -442,14 +427,15 @@ namespace Timers{
                     case InterruptType::InputCapture       : if(cbInputCaptureCallback)  cbInputCaptureCallback() ; break;
                 }
             }
-        };
-
-    public:
-        static OCPin<Gpio::PinOC1A, BITPOS_COM1A, BITPOS_FOC1A> ChannelA;
-        static OCPin<Gpio::PinOC1B, BITPOS_COM1B, BITPOS_FOC1B> ChannelB;
-        static Timer1::TimerInterrupt Interrupts;
-
-        static void resetCounter(){
+        }static Interrupts;
+        static void disable(){
+            setClock(Clock::Stopped);
+        }
+        static void enable(){
+            mcu::System::Power::activatePeripheral(Peripheral::Timer1);
+            if(currentClock != Clock::Stopped) setClock(currentClock);
+        }
+        static void clearCounter(){
             {AtomicBlock ab;
                 /* write high byte (first)*/
                 mcu::Regs::Timers::Timer1::TimerCounterReg_HByte = 0x00;
@@ -482,14 +468,14 @@ namespace Timers{
                 Regs::Timers::Timer1::TimerCounterControlRegB.clearBitmask(RegBits::Timers::Timer1::TCCR1B_ICES1);
             }
         }
-        static void setClock(Timer1::Clock clk){
+        static void setClock(Clock clk){
             constexpr uint8_t bitmask_tccrb_clk_bits = ~(RegBits::Timers::Timer1::TCCR1B_CS10|
                                                          RegBits::Timers::Timer1::TCCR1B_CS11|
                                                          RegBits::Timers::Timer1::TCCR1B_CS12);
             Regs::Timers::Timer1::TimerCounterControlRegB.writeMasked(static_cast<uint8_t>(clk), bitmask_tccrb_clk_bits);
             currentClock = clk;
         }
-        static void setCompareValueA(uint16_t compareVal){
+        inline static void setCompareValueA(uint16_t compareVal){
             {AtomicBlock ab;
                 /* write: high byte (first)*/
                 mcu::Regs::Timers::Timer1::OutputCompareRegA_HByte.setValue(compareVal >> 8);
@@ -497,7 +483,7 @@ namespace Timers{
                 mcu::Regs::Timers::Timer1::OutputCompareRegA_LByte.setValue(compareVal);
             }
         }
-        static void setCompareValueB(uint16_t compareVal){
+        inline static void setCompareValueB(uint16_t compareVal){
             {AtomicBlock ab;
                 /* write high byte first*/
                 mcu::Regs::Timers::Timer1::OutputCompareRegB_HByte.setValue(compareVal >> 8);
@@ -505,7 +491,7 @@ namespace Timers{
                 mcu::Regs::Timers::Timer1::OutputCompareRegB_LByte.setValue(compareVal);            
             }
         }
-        static void setCounterValue(uint16_t counterVal){
+        inline static void setCounterValue(uint16_t counterVal){
             {AtomicBlock ab;
                 /* write high byte (first)*/
                 mcu::Regs::Timers::Timer1::TimerCounterReg_HByte = (counterVal >> 8);
@@ -589,26 +575,6 @@ c.Write new values to TCNT2, OCR2x, and TCCR2x.
 d.To switch to asynchronous operation: Wait for TCN2xUB, OCR2xUB, and TCR2xUB.
 e.Clear the Timer/Counter2 interrupt flags.
 f.Enable interrupts, if needed.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 */
     class Timer2{
     public:
@@ -686,7 +652,10 @@ f.Enable interrupts, if needed.
                     mcu::Regs::Timers::Timer2::TimerCounterControlRegB.setBitmask(1 << focBitPos);
                 }
             };
-        struct TimerInterrupt{
+    public:
+        static OCPin<Gpio::PinOC2A, BITPOS_COM0A, BITPOS_FOC0A> ChannelA;
+        static OCPin<Gpio::PinOC2B, BITPOS_COM0B, BITPOS_FOC0B> ChannelB;
+        struct{ //Interrupts
             void enable(InterruptType intType){
                 Regs::Timers::Timer2::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));
             }
@@ -721,11 +690,7 @@ f.Enable interrupts, if needed.
                     case InterruptType::OutputCompareMatchB: if(cbCompareMatchBCallback) cbCompareMatchBCallback(); break;
                 }
             }
-        };
-    public:
-        static OCPin<Gpio::PinOC2A, BITPOS_COM0A, BITPOS_FOC0A> ChannelA;
-        static OCPin<Gpio::PinOC2B, BITPOS_COM0B, BITPOS_FOC0B> ChannelB;
-        static TimerInterrupt Interrupts;
+        }static Interrupts;
         inline static void synch(){
             mcu::Regs::Timers::GeneralTimerCounterControlReg.setBitmask(mcu::RegBits::Timers::Common::GTCCR_PSRASY);
         }
@@ -743,6 +708,7 @@ f.Enable interrupts, if needed.
             setClock(Clock::Stopped);
         }
         static void enable(){
+            /* Logical Error !!!*/
             mcu::System::Power::activatePeripheral(Peripheral::Timer2);
             if(currentClock != Clock::Stopped) setClock(currentClock);
         }
@@ -776,16 +742,6 @@ f.Enable interrupts, if needed.
                 while(Regs::Timers::Timer2::AsynchronousStatusReg.readBit(RegBits::Timers::Timer2::ASSR_TCR2BUB));
             }
         }
-        static Mode getMode(){
-            /* TCCR2A    :|-|-|-|-|-|-|WGM21|WGM20|*/
-            constexpr uint8_t bitmask_tccra_mode_bits = (RegBits::Timers::Timer2::TCCR2A_WGM20|
-                                                         RegBits::Timers::Timer2::TCCR2A_WGM21);
-            /* TCCR2B    :|-|-|-|-|WGM22|-|-|-|*/
-            constexpr uint8_t bitmask_tccrb_mode_bits = (RegBits::Timers::Timer2::TCCR2B_WGM22);
-            uint8_t mode = Regs::Timers::Timer2::TimerCounterControlRegA.getValue(bitmask_tccra_mode_bits)|
-                           Regs::Timers::Timer2::TimerCounterControlRegB.getValue(bitmask_tccrb_mode_bits);
-            return (static_cast<Mode>(mode));
-        }
         inline static void setCompareValueA(uint8_t compareVal){
             mcu::Regs::Timers::Timer2::OutputCompareRegA.setValue(compareVal);
             if(ClockSource::SystemClock != getClockSource()){
@@ -813,6 +769,22 @@ f.Enable interrupts, if needed.
         static uint8_t getCounterValue(){
             return mcu::Regs::Timers::Timer2::TimerCounterReg;
         };
+        static Clock   getClock(){
+            constexpr uint8_t bitmask_tccrb_cs_bits = (RegBits::Timers::Timer2::TCCR2B_CS20|
+                                                       RegBits::Timers::Timer2::TCCR2B_CS21|
+                                                       RegBits::Timers::Timer2::TCCR2B_CS22);
+            return (static_cast<Clock>(Regs::Timers::Timer2::TimerCounterControlRegB.getValue(bitmask_tccrb_cs_bits)));
+        }
+        static Mode    getMode(){
+            /* TCCR2A    :|-|-|-|-|-|-|WGM21|WGM20|*/
+            constexpr uint8_t bitmask_tccra_mode_bits = (RegBits::Timers::Timer2::TCCR2A_WGM20|
+                                                         RegBits::Timers::Timer2::TCCR2A_WGM21);
+            /* TCCR2B    :|-|-|-|-|WGM22|-|-|-|*/
+            constexpr uint8_t bitmask_tccrb_mode_bits = (RegBits::Timers::Timer2::TCCR2B_WGM22);
+            uint8_t mode = Regs::Timers::Timer2::TimerCounterControlRegA.getValue(bitmask_tccra_mode_bits)|
+                           Regs::Timers::Timer2::TimerCounterControlRegB.getValue(bitmask_tccrb_mode_bits);
+            return (static_cast<Mode>(mode));
+        }
         static void syncTimer(){
 
         }
@@ -854,11 +826,11 @@ ISR(TIMER1_COMPB_vect){mcu::Timers::Timer1::Interrupts.handler(mcu::Timers::Time
 /* Timer1 capture event interrupt*/
 ISR(TIMER1_CAPT_vect){mcu::Timers::Timer1::Interrupts.handler(mcu::Timers::Timer1::InterruptType::InputCapture);}
 
-/* Timer2 */
+/* Timer2 Overflow Interrupt*/
 ISR(TIMER2_OVF_vect){mcu::Timers::Timer2::Interrupts.handler(mcu::Timers::Timer2::InterruptType::Overflow);}
-/* Timer2 */
+/* Timer2 Output Compare Match A Interrupt*/
 ISR(TIMER2_COMPA_vect){mcu::Timers::Timer2::Interrupts.handler(mcu::Timers::Timer2::InterruptType::OutputCompareMatchA);}
-/* Timer2 */
+/* Timer2 Output Compare Match B Interrupt*/
 ISR(TIMER2_COMPB_vect){mcu::Timers::Timer2::Interrupts.handler(mcu::Timers::Timer2::InterruptType::OutputCompareMatchB);}
 
 #endif //TIMERS_HPP
@@ -871,7 +843,7 @@ void count(){
     cycle++;
 }
 
-void foof(){
+void foog(){
     using T2 = mcu::Timers::Timer2;     
     T2::init(T2::Mode::Normal,
              T2::Clock::NoPrescaling,

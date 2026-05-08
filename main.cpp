@@ -8,7 +8,7 @@
 //#include "HAL/sysctrl.hpp"
 #include "HAL/serialstream.hpp"
 //#include "HAL/spi.hpp"
-//#include "HAL/adc.hpp"
+#include "HAL/adc.hpp"
 //#include "HAL/twi.hpp"
 //#include "HAL/utils.hpp"
 //#include "HAL/eeprom.hpp"
@@ -16,6 +16,7 @@
 
 using namespace mcu;
 using namespace HAL;
+
 
 void sysReset(){
     static uint8_t resetCount = 0;
@@ -40,7 +41,7 @@ void timerCallback(){
 }
 
 int main (){    
-
+//    cstd::cout << "--------------" << cstd::endl;
     mcu::System::Clock::setClockPrescaler(Prescaler::NoDivision);
 
     _delay_ms(10);
@@ -50,11 +51,10 @@ int main (){
                                   UsartStopBits::One,
                                   UsartParityMode::Disabled);
     
-    mcu::System::WatchdogTimer::attachInterrupt(sysReset);
+    mcu::System::WatchdogTimer::Interrupt.attach(sysReset);
     mcu::System::WatchdogTimer::enable(WatchdogMode::InterruptAndSystemReset, WatchdogTimeout::_4sec);
     sei();
     mcu::System::WatchdogTimer::disable();
-
     togglingPin::setPinMode(HAL::PinMode::Output);
 
     // FASTPWM_WITHOCR
@@ -96,37 +96,61 @@ int main (){
 //    mcu::Timers::Timer0::Interrupts.attach(mcu::Timers::Timer0::InterruptType::Overflow, timerCallback);
 //    mcu::Timers::Timer0::ChannelA.setOutputMode(timer0::OutputMode::DisconnectedFromPin);
 //    timer0::ChannelA.setOutputMode(timer0::OutputMode::DisconnectedFromPin);
+    
+    
     using timer0 = mcu::Timers::Timer0;
     timer0::init(timer0::Mode::FastPWM, timer0::Clock::DividedBy1024);
+    timer0::ChannelA.setOutputMode(timer0::OutputMode::ClearPinOnCompareMatch);
     timer0::setCompareValueA(127);
-    timer0::ChannelA.setOutputMode(timer0::OutputMode::SetPinOnCompareMatch);
     timer0::ChannelA.enable();
     timer0::Interrupts.attach(timer0::InterruptType::OutputCompareMatchA, timerCallback);    
 
 
-//    using t1 = mcu::Timers::Timer1;
-//    t1::init(t1::Mode::FastPWM_9bit, t1::Clock::NoPrescaling);
-//    t1::enableOutputComparePinA();
-//    t1::ChannelA.setOutputMode(t1::OutputMode::ClearOnCompareMatch);
+    using t1 = mcu::Timers::Timer1;
+    t1::init(t1::Mode::FastPWM_10bit, t1::Clock::NoPrescaling);
+    t1::ChannelA.setOutputMode(t1::OutputMode::ClearOnCompareMatch);
+    t1::ChannelA.enable();
 
-    uint8_t duty = 0;
+    using t2 = mcu::Timers::Timer2;
+    t2::init(t2::Mode::FastPWM, t2::Clock::DividedBy8, t2::ClockSource::SystemClock);
+    t2::ChannelA.setOutputMode(t2::OutputMode::ClearOnCompareMatch);
+    t2::ChannelA.enable();
+    t2::setCompareValueA(32);
+    t2::ChannelB.setOutputMode(t2::OutputMode::DisconnectedFromPin);
+
+    uint8_t duty = 1;
     uint16_t duty16bit = 0;
-
     builtinLed::setPinMode(PinMode::Output);
-    builtinLed::enableInputPullUp();
+//    builtinLed::enableInputPullUp();
+
+
+    mcu::Timers::Timer0::Interrupts.detach(Timers::Timer0::InterruptType::All);
+    mcu::Timers::Timer1::Interrupts.detach(Timers::Timer1::InterruptType::All);
+    mcu::Timers::Timer2::Interrupts.detach(Timers::Timer2::InterruptType::All);
+
+    mcu::Peripherals::Adc::init(AdcChannel::InternalTempSensor);
+    mcu::Peripherals::Adc::setAdcClockPrescaler(AdcClock::DividedBy128);
+    mcu::Peripherals::Adc::selectReference(AdcReference::Internal_1v1);
+    mcu::Peripherals::Adc::setResultAdjust(AdcResultAdjust::Right);
+    mcu::Peripherals::Adc::ConversionCompletedInterrupt.attach(timerCallback);
+    
+
     while(1){
 //        mcu::System::WatchdogTimer::reset();
         /* ArduinoUnoR3Pin:9 (PB1)*/
 //        togglingPin::toggle();      //2.65MHz @16MHz
 //        t0::setCompareValueA(duty);
+//        _delay_ms(10);
+        
+        cstd::cout << mcu::Peripherals::Adc::read() << cstd::endl;
+        _delay_ms(200);
 
-        _delay_ms(100);
         duty++;
         duty16bit++;
         mcu::Timers::Timer0::setCompareValueA(duty);
-//        t1::setCompareValueA(duty16bit);
-//        if(duty==t0::getCompareValueA())duty=0;
-//        t0::setCompareValueB(duty);
+        t1::setCompareValueA(duty16bit);
+//        if(duty==timer0::getCompareValueA())duty=0;
+        timer0::setCompareValueB(duty);
     }
 
     return 0;

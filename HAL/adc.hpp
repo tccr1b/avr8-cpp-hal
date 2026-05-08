@@ -4,24 +4,27 @@
 #define __AVR_ATmega328P__
 #include "registers.hpp"
 #include "sysctrl.hpp"
+#include "HAL/utils/atomicblock.hpp"
 
 #define BITMASK_ADC_REF         0x3F
 #define BITMASK_ADC_AUTOTRIGSRC 0xF8
 #define BITMASK_ADC_CHANNELSEL  0xF0
 #define BITMASK_ADC_PRESCALER   0xF8
+#define BITMASK_ADC_DIDR        0x3F
 
 using namespace mcu;
 
-enum class AdcReference     : uint8_t{
+enum class AdcReference        : uint8_t{
     /* bitmask: 0x3F*/
     /*Internal 1.1V voltage reference with external capacitor at AREF pin*/
-    Internal= RegBits::Adc::ADMUX_REFS1 | RegBits::Adc::ADMUX_REFS0,
+    Internal_1v1 = RegBits::Adc::ADMUX_REFS1 | RegBits::Adc::ADMUX_REFS0,
     /*AVCC with external capacitor at AREF pin*/
-    Avcc    = RegBits::Adc::ADMUX_REFS0,
+    Internal_Avcc= RegBits::Adc::ADMUX_REFS0,
     /*Voltage on AREF pin*/
-    External= 0x00,
+    External_Aref= 0x00,
 };
-enum class AdcPrescaler     : uint8_t{
+enum class AdcClock            : uint8_t{
+    DividedBy_2  = 0x00,
     DividedBy2   = 0x01,
     DividedBy4   = 0x02,
     DividedBy8   = 0x03,
@@ -30,91 +33,143 @@ enum class AdcPrescaler     : uint8_t{
     DividedBy64  = 0x06,
     DividedBy128 = 0x07,
 };
-enum class AdcTriggerSource : uint8_t{
+enum class AdcAutoTriggerSource: uint8_t{
     FreeRunning         = 0x00,
     AnalogComparator    = RegBits::Adc::ADCSRB_ADTS0,
-    ExternalIRQ         = RegBits::Adc::ADCSRB_ADTS1,
-    Timer0CompareMatchA = RegBits::Adc::ADCSRB_ADTS0 | RegBits::Adc::ADCSRB_ADTS1,
-    Timer0Overflow      = RegBits::Adc::ADCSRB_ADTS2,
-    Timer1CompareMatchB = RegBits::Adc::ADCSRB_ADTS0 | RegBits::Adc::ADCSRB_ADTS2,
-    Timer1Overflow      = RegBits::Adc::ADCSRB_ADTS1 | RegBits::Adc::ADCSRB_ADTS2,
-    Timer1CaptureEvent  = RegBits::Adc::ADCSRB_ADTS0 | RegBits::Adc::ADCSRB_ADTS1 | RegBits::Adc::ADCSRB_ADTS2,
+    ExternalIRQ0        = RegBits::Adc::ADCSRB_ADTS1,
+    Timer0_CompareMatchA= RegBits::Adc::ADCSRB_ADTS1|RegBits::Adc::ADCSRB_ADTS0,
+    Timer0_Overflow     = RegBits::Adc::ADCSRB_ADTS2,
+    Timer1_CompareMatchB= RegBits::Adc::ADCSRB_ADTS2|RegBits::Adc::ADCSRB_ADTS0,
+    Timer1_Overflow     = RegBits::Adc::ADCSRB_ADTS2|RegBits::Adc::ADCSRB_ADTS1,
+    Timer1_CaptureEvent = RegBits::Adc::ADCSRB_ADTS2|RegBits::Adc::ADCSRB_ADTS1|RegBits::Adc::ADCSRB_ADTS0,
 };
-enum class AdcChannel       : uint8_t{
-    No0 = 0x00,
-    No1 = 0x01,
-    No2 = 0x02,
-    No3 = 0x03,
-    No4 = 0x04,
-    No5 = 0x05,
-    No6 = 0x06,
-    No7 = 0x07,
+enum class AdcChannel          : uint8_t{
+    /* ADC0*/
+    No0 = 0x00, //0b0000'0000
+    /* ADC1*/
+    No1 = 0x01, //0b0000'0001
+    /* ADC2*/
+    No2 = 0x02, //0b0000'0010
+    /* ADC3*/
+    No3 = 0x03, //0b0000'0011
+    /* ADC4*/
+    No4 = 0x04, //0b0000'0100
+    /* ADC5*/
+    No5 = 0x05, //0b0000'0101
+    /* ADC6*/
+    No6 = 0x06, //0b0000'0110
+    /* ADC7*/
+    No7 = 0x07, //0b0000'0111
+    /* Built-in temperature sensor for some packages (SPDIP, TQFP, VQFN)*/
     InternalTempSensor = 0x08,
-    BG1v1  = 0x0E,
-    Ground = 0x0F,
+    /* Band gap voltage*/
+    Vbg_1v1= 0x0E,
+    GND_0V = 0x0F,
+};
+enum class AdcResultAdjust     : uint8_t{
+    Right=0,
+    Left =1
 };
 
 namespace mcu{
 namespace Peripherals{
     class Adc{
     private:
-        const static uint8_t bitmask_acsra_prescaler_bits   = ~(RegBits::Adc::ADCSRA_ADPS0| 
-                                                                RegBits::Adc::ADCSRA_ADPS1| 
-                                                                RegBits::Adc::ADCSRA_ADPS2);
-        const static uint8_t bitmask_acsrb_trigger_sel_bits = ~(RegBits::Adc::ADCSRB_ADTS0|
-                                                                RegBits::Adc::ADCSRB_ADTS1|
-                                                                RegBits::Adc::ADCSRB_ADTS2);
-        const static uint8_t bitmask_admux_ref_sel_bits     = ~(RegBits::Adc::ADMUX_REFS0|
-                                                                RegBits::Adc::ADMUX_REFS1);
-        const static uint8_t bitmask_admux_channel_sel_bits = ~(RegBits::Adc::ADMUX_MUX0|
-                                                                RegBits::Adc::ADMUX_MUX1|
-                                                                RegBits::Adc::ADMUX_MUX2|
-                                                                RegBits::Adc::ADMUX_MUX3);
+        const static uint8_t bitmask_acsra_prescaler_bits   = (RegBits::Adc::ADCSRA_ADPS0| 
+                                                               RegBits::Adc::ADCSRA_ADPS1| 
+                                                               RegBits::Adc::ADCSRA_ADPS2);
+        const static uint8_t bitmask_acsrb_trigger_sel_bits = (RegBits::Adc::ADCSRB_ADTS0|
+                                                               RegBits::Adc::ADCSRB_ADTS1|
+                                                               RegBits::Adc::ADCSRB_ADTS2);
+        const static uint8_t bitmask_admux_ref_sel_bits     = (RegBits::Adc::ADMUX_REFS0|
+                                                               RegBits::Adc::ADMUX_REFS1);
+        const static uint8_t bitmask_admux_channel_sel_bits = (RegBits::Adc::ADMUX_MUX0|
+                                                               RegBits::Adc::ADMUX_MUX1|
+                                                               RegBits::Adc::ADMUX_MUX2|
+                                                               RegBits::Adc::ADMUX_MUX3);
+        using Callback = void(*)();
+        inline static Callback cbAdcConversionCompletedCallback = nullptr;
+
     public:
+        struct{ //Interrupt
+            void enable(){mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
+            void disable(){mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
+            void attach(Callback callbackFunc){cbAdcConversionCompletedCallback = callbackFunc; this->enable();}
+            void detach(){cbAdcConversionCompletedCallback = nullptr; this->disable();}
+            inline void handler(){if(cbAdcConversionCompletedCallback) cbAdcConversionCompletedCallback();}
+        }static ConversionCompletedInterrupt;
         static void selectChannel(AdcChannel ch){
-            mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeBitmask(BITMASK_ADC_CHANNELSEL | static_cast<uint8_t>(ch));
+            mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ch), ~bitmask_admux_channel_sel_bits);
         }
         static AdcChannel getActiveChannel(){
-            return static_cast<AdcChannel>(~BITMASK_ADC_CHANNELSEL & mcu::Regs::Adc::AdcMultiplexerSelectionReg.getValue());
+            return static_cast<AdcChannel>(Regs::Adc::AdcMultiplexerSelectionReg.getValue(bitmask_admux_channel_sel_bits));
         }
-        static void setAdcClockPrescaler(AdcPrescaler adcPresc){
+        static void setAdcClockPrescaler(AdcClock adcPresc){
             uint32_t fCpu = mcu::System::Clock::getCpuFrequency();
-            mcu::Regs::Adc::AdcControlAndStatusRegA.writeBitmask(bitmask_acsra_prescaler_bits | static_cast<uint8_t>(adcPresc));
+            mcu::Regs::Adc::AdcControlAndStatusRegA.writeMasked(static_cast<uint8_t>(adcPresc), ~bitmask_acsra_prescaler_bits);
         }
-        static AdcPrescaler getAdcClockPrescaler(){
-            return static_cast<AdcPrescaler>(~bitmask_acsra_prescaler_bits & mcu::Regs::Adc::AdcControlAndStatusRegA.getValue());
+        static AdcClock getAdcClockPrescaler(){
+            return static_cast<AdcClock>(Regs::Adc::AdcControlAndStatusRegA.getValue(bitmask_acsra_prescaler_bits));
         }
-        static void selectAutoTrigSource(AdcTriggerSource trigSrc){
-            mcu::Regs::Adc::AdcControlAndStatusRegB.writeBitmask(bitmask_acsrb_trigger_sel_bits | static_cast<uint8_t>(trigSrc));
+        static void selectAutoTriggerSource(AdcAutoTriggerSource trigSrc){
+            mcu::Regs::Adc::AdcControlAndStatusRegB.writeMasked(static_cast<uint8_t>(trigSrc), ~bitmask_acsrb_trigger_sel_bits);
         }
-        static AdcTriggerSource getTriggerSource(){
-            return static_cast<AdcTriggerSource>(~bitmask_acsrb_trigger_sel_bits & mcu::Regs::Adc::AdcControlAndStatusRegB.getValue());
+        static AdcAutoTriggerSource getAutoTriggerSource(){
+            return static_cast<AdcAutoTriggerSource>(Regs::Adc::AdcControlAndStatusRegB.getValue(bitmask_acsrb_trigger_sel_bits));
         }
-        static void setReference(AdcReference ref){
-            mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeBitmask(bitmask_admux_ref_sel_bits | static_cast<uint8_t>(ref));
+        static void selectReference(AdcReference ref){
+            mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ref), ~bitmask_admux_ref_sel_bits);
         }
         static AdcReference getReference(){
             return static_cast<AdcReference>(~bitmask_admux_ref_sel_bits & mcu::Regs::Adc::AdcMultiplexerSelectionReg.getValue());
         }
-        static void enableAdc() {Regs::Adc::AdcControlAndStatusRegA.setBitmask(RegBits::Adc::ADCSRA_ADEN);}
-        static void disableAdc(){Regs::Adc::AdcControlAndStatusRegA.clearBitmask(RegBits::Adc::ADCSRA_ADEN);}
-        static void autoTriggerEnable(){
+        static void enableAdc(){
+            /* The Power Reduction ADC bit, PRADC must be disabled by writing a logical zero to enable the ADC.*/
+            mcu::System::Power::activatePeripheral(Peripheral::Adc);
+            Regs::Adc::AdcControlAndStatusRegA.setBitmask(RegBits::Adc::ADCSRA_ADEN);
+        }
+        static void disableAdc(){
+            Regs::Adc::AdcControlAndStatusRegA.clearBitmask(RegBits::Adc::ADCSRA_ADEN);
+        }
+        static void enableAutoTriggering(){
             mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);
         }
-        static void autoTriggerDisable(){
+        static void disableAutoTriggering(){
             mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);
         }
-        static void enableInterrupt(){
-            mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);
+        static void disableDigitalInputBuffer(AdcChannel adc_channel){
+            uint8_t channel_pos = 1 << static_cast<uint8_t>(adc_channel);
+            if(channel_pos & BITMASK_ADC_DIDR) return;
+            mcu::Regs::Adc::DigitalInputDisableReg0.setBitmask(1 << static_cast<uint8_t>(adc_channel));
         }
-        static void disableInterrupt(){
-            mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);
+        static void enableDigitalInputBuffer(AdcChannel adc_channel){
+            uint8_t channel_pos = 1 << static_cast<uint8_t>(adc_channel);
+            if(channel_pos & BITMASK_ADC_DIDR) return;
+            mcu::Regs::Adc::DigitalInputDisableReg0.clearBitmask(1 << channel_pos);
         }
-        static void digitalInputDisable(uint8_t inputNo){
-            mcu::Regs::Adc::DigitalInputDisableReg0.writeBitmask(inputNo);
+        static void setResultAdjust(AdcResultAdjust adj){
+            if(adj == AdcResultAdjust::Right){
+                Regs::Adc::AdcMultiplexerSelectionReg.clearBitmask(RegBits::Adc::ADMUX_ADLAR);
+            }else{
+                Regs::Adc::AdcMultiplexerSelectionReg.setBitmask(RegBits::Adc::ADMUX_ADLAR);
+            }
         }
         static uint16_t read(){
-
+            uint16_t rawAdcVal = 0x0000;
+            uint8_t  lowByte   = 0x00;
+            Regs::Adc::AdcControlAndStatusRegA.setBitmask(RegBits::Adc::ADCSRA_ADSC);
+            while(Regs::Adc::AdcControlAndStatusRegA.readBit(RegBits::Adc::ADCSRA_ADSC)){}
+            {AtomicBlock ab;
+                lowByte = Regs::Adc::AdcDataReg_LByte;  // 0bLLLL'LLLL
+                rawAdcVal = Regs::Adc::AdcDataReg_HByte;// 0b0000'0000'HHHH'HHHH
+                rawAdcVal <<= 8;                        // 0bHHHH'HHHH'0000'0000
+                rawAdcVal |= lowByte;                   // 0bHHHH'HHHH'LLLL'LLLL
+            }
+            return rawAdcVal;
+        }
+        static void init(AdcChannel chan){
+            selectChannel(chan);
+            enableAdc();
         }
     };
 } // namespace Peripherals
@@ -122,15 +177,17 @@ namespace Peripherals{
 
 
 void foof(){
-    mcu::Peripherals::Adc::selectAutoTrigSource(AdcTriggerSource::FreeRunning);
-    mcu::Peripherals::Adc::selectAutoTrigSource(AdcTriggerSource::ExternalIRQ);
-    mcu::Peripherals::Adc::selectAutoTrigSource(AdcTriggerSource::Timer1CaptureEvent);
-    mcu::Peripherals::Adc::setAdcClockPrescaler(AdcPrescaler::DividedBy32);
+    mcu::Peripherals::Adc::selectAutoTriggerSource(AdcAutoTriggerSource::FreeRunning);
+    mcu::Peripherals::Adc::selectAutoTriggerSource(AdcAutoTriggerSource::ExternalIRQ0);
+    mcu::Peripherals::Adc::selectAutoTriggerSource(AdcAutoTriggerSource::Timer1_CaptureEvent);
+    mcu::Peripherals::Adc::setAdcClockPrescaler(AdcClock::DividedBy32);
     mcu::Peripherals::Adc::selectChannel(AdcChannel::InternalTempSensor);
-    mcu::Peripherals::Adc::selectAutoTrigSource(AdcTriggerSource::FreeRunning);
-    mcu::Peripherals::Adc::digitalInputDisable(0);
+    mcu::Peripherals::Adc::selectAutoTriggerSource(AdcAutoTriggerSource::FreeRunning);
+    mcu::Peripherals::Adc::disableDigitalInputBuffer(AdcChannel::No0);
     mcu::Peripherals::Adc::getActiveChannel();
     mcu::Peripherals::Adc::selectChannel(AdcChannel::No7);
 }
+
+ISR(ADC_vect){mcu::Peripherals::Adc::ConversionCompletedInterrupt.handler();}
 
 #endif // ADC_HPP

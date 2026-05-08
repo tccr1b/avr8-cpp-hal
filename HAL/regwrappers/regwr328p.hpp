@@ -971,44 +971,6 @@ always read as zero when this bit is set. When an analog signal is applied to th
 is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.*/
             constexpr uint8_t DIDR1_AIN1D  = (1 << AIN1D);
 
-            /* DIDR0 REG BITS */
-            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
-When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
-register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
-input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
-Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
-            constexpr uint8_t DIDR0_ADC0D = (1 << ADC0D);
-            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
-When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
-register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
-input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
-Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
-            constexpr uint8_t DIDR0_ADC1D = (1 << ADC1D);
-            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
-When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
-register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
-input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
-Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
-            constexpr uint8_t DIDR0_ADC2D = (1 << ADC2D);
-            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
-When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
-register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
-input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
-Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
-            constexpr uint8_t DIDR0_ADC3D = (1 << ADC3D);
-            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
-When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
-register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
-input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
-Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
-            constexpr uint8_t DIDR0_ADC4D = (1 << ADC4D);
-            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
-When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
-register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
-input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
-Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
-            constexpr uint8_t DIDR0_ADC5D = (1 << ADC5D);
-
             /* PCMSK2 */
             /*Bit 7..0 – PCINT23..16: Pin Change Enable Mask 23..16
 Each PCINT23..16-bit selects whether pin change interrupt is enabled on the corresponding I/O pin. If PCINT23..16 is set
@@ -2216,6 +2178,43 @@ off the analog comparator. This will reduce power consumption in active and idle
 analog comparator interrupt must be disabled by clearing the ACIE bit in ACSR. Otherwise an interrupt can occur when the
 bit is changed.*/
             constexpr uint8_t ACSR_ACD   = (1 << ACD);
+            /* DIDR0 REG BITS */
+            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
+When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
+register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
+input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
+Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
+            constexpr uint8_t DIDR0_ADC0D = (1 << ADC0D);
+            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
+When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
+register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
+input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
+Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
+            constexpr uint8_t DIDR0_ADC1D = (1 << ADC1D);
+            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
+When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
+register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
+input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
+Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
+            constexpr uint8_t DIDR0_ADC2D = (1 << ADC2D);
+            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
+When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
+register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
+input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
+Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
+            constexpr uint8_t DIDR0_ADC3D = (1 << ADC3D);
+            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
+When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
+register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
+input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
+Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
+            constexpr uint8_t DIDR0_ADC4D = (1 << ADC4D);
+            /*Bit 5:0 – ADC5D..ADC0D: ADC5..0 Digital Input Disable
+When this bit is written logic one, the digital input buffer on the corresponding ADC pin is disabled. The corresponding PIN
+register bit will always read as zero when this bit is set. When an analog signal is applied to the ADC5..0 pin and the digital
+input from this pin is not needed, this bit should be written logic one to reduce power consumption in the digital input buffer.
+Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
+            constexpr uint8_t DIDR0_ADC5D = (1 << ADC5D);
         }
         namespace Spi{
             /*SPSR*/
