@@ -7,12 +7,13 @@
 #include "HAL/watchdog.hpp"
 //#include "HAL/sysctrl.hpp"
 #include "HAL/serialstream.hpp"
-//#include "HAL/spi.hpp"
+#include "HAL/spi.hpp"
 #include "HAL/adc.hpp"
 //#include "HAL/twi.hpp"
 //#include "HAL/utils.hpp"
 //#include "HAL/eeprom.hpp"
 #include "HAL/timers.hpp"
+#include "HAL/analogcomp.hpp"
 
 using namespace mcu;
 using namespace HAL;
@@ -43,7 +44,7 @@ void timerCallback(){
 int main (){    
 //    cstd::cout << "--------------" << cstd::endl;
     mcu::System::Clock::setClockPrescaler(Prescaler::NoDivision);
-
+    
     _delay_ms(10);
     mcu::Peripherals::Usart::init(UsartMode::Asynchronous,
                                   UsartBaudrate::_9600bps,
@@ -133,8 +134,10 @@ int main (){
     mcu::Peripherals::Adc::selectReference(AdcReference::Internal_1v1);
     mcu::Peripherals::Adc::setResultAdjust(AdcResultAdjust::Right);
     mcu::Peripherals::Adc::ConversionCompletedInterrupt.attach(timerCallback);
+    mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::ExternalIRQ0).enable();
     
-
+    mcu::Peripherals::AnalogComp::Interrupt.selectMode(AcInterruptMode::InterruptOnRisingOutputEdge);
+    
     while(1){
 //        mcu::System::WatchdogTimer::reset();
         /* ArduinoUnoR3Pin:9 (PB1)*/

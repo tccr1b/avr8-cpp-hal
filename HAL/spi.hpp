@@ -87,6 +87,13 @@ private:
         return !Regs::Spi::SpiStatusReg.readBit(RegBits::Spi::SPSR_SPIF);
     }
 public:
+    struct{ //SPI Interrupt
+        void enable() {Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPIE);}
+        void disable(){Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_SPIE);}
+        void attach(Callback cbFunc){interruptCallback = cbFunc; this->enable();}
+        void detach() {interruptCallback = nullptr; this->disable();}
+        void handle() {if(interruptCallback) interruptCallback();}
+    }static SpiInterrupt;
     inline static bool isEnabled(){
         return Regs::Spi::SpiControlReg.readBit(RegBits::Spi::SPCR_SPE) && 
                !Regs::Core::PowerReductionReg.readBit(RegBits::Core::PRR_PRSPI);
@@ -100,10 +107,6 @@ public:
         /* Enable SPI*/
         Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPE);
     }
-    static void attachInterrupt(Callback cbFunc){interruptCallback = cbFunc;}
-    static void detachInterrupt(){interruptCallback = nullptr;}
-    /* For ISR, do not use.*/
-    inline static void interruptHandler(){if(interruptCallback) interruptCallback();}
     static void init(SpiMode spiMode = SpiMode::Master,
                      SpiClockSpeed speed = SpiClockSpeed::dividedBy64,
                      SpiDataMode spiDataMode = SpiDataMode::Mode0){
@@ -177,8 +180,6 @@ public:
         constexpr uint8_t bitmask_spcr_data_mode_bits = ~(RegBits::Spi::SPCR_CPHA | RegBits::Spi::SPCR_CPOL);
         Regs::Spi::SpiControlReg.writeMasked(static_cast<uint8_t>(dataMode), bitmask_spcr_data_mode_bits);
     }
-    static void enableSpiInterrupt(){Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPIE);}
-    static void disableSpiInterrupt(){Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_SPIE);}
 /* interrupt driven?*/
     static inline uint8_t transferByte(uint8_t data){
 //        uint8_t incomingData = mcu::Regs::Spi::SpiDataReg;
@@ -192,6 +193,6 @@ public:
 } // namespace mcu
 
 /* SPI Transfer Complete interrupt*/
-ISR(SPI_STC_vect){mcu::Peripherals::Spi::interruptHandler();}
+ISR(SPI_STC_vect){mcu::Peripherals::Spi::SpiInterrupt.handle();}
 
 #endif //SPI_HPP

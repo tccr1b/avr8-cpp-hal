@@ -243,7 +243,7 @@ private:
         if(txBuffer.pop(data)){
             Regs::Uart::UartDataReg.setValue(data);
         }else{
-            disableInterrupt(UsartInterruptType::DataRegisterEmpty);
+            Interrupts.disable(UsartInterruptType::DataRegisterEmpty);
         }
     }
     static void handleRxInterrupt(){
@@ -283,39 +283,43 @@ private:
     }
 
     /* Controlling*/
-    static void enableInterrupt(UsartInterruptType intType){
-        mcu::Regs::Uart::UartControlAndStatusRegB.setBitmask(static_cast<uint8_t>(intType));
-        /* Enable global interrupt (?)*/
-        sei();
-    }
-    static void disableInterrupt(UsartInterruptType intType){
-        mcu::Regs::Uart::UartControlAndStatusRegB.clearBitmask(static_cast<uint8_t>(intType));
-    }
-    static void attachInterrupt(UsartInterruptType intType, Callback callbackFunc){
-        switch (intType){
-        case UsartInterruptType::RxComplete: rxCompleteCallback = callbackFunc; break;
-        case UsartInterruptType::TxComplete: txCompleteCallback = callbackFunc; break;
-        case UsartInterruptType::DataRegisterEmpty: dataRegisterEmptyCallback = callbackFunc; break;
-        case UsartInterruptType::AllInterrupts: break;}
-        /* Enable related interrupt*/
-        enableInterrupt(intType);
-    }
-    static void detachInterrupt(UsartInterruptType intType){
-        switch (intType){
-        case UsartInterruptType::RxComplete: rxCompleteCallback = nullptr; break;
-        case UsartInterruptType::TxComplete: txCompleteCallback = nullptr; break;
-        case UsartInterruptType::DataRegisterEmpty: dataRegisterEmptyCallback = nullptr; break;
-        case UsartInterruptType::AllInterrupts: ;break;}
-        /* Disable related interrupt*/
-        disableInterrupt(intType);
-
-    }
-    static void interruptHandler(UsartInterruptType intType){
-        switch (intType){
-        case UsartInterruptType::RxComplete: if(rxCompleteCallback) rxCompleteCallback(); break;
-        case UsartInterruptType::TxComplete: if(txCompleteCallback) txCompleteCallback(); break;
-        case UsartInterruptType::DataRegisterEmpty: if(dataRegisterEmptyCallback) dataRegisterEmptyCallback(); break;}
-    }
+    struct{ //Interrrupts
+        void enable(UsartInterruptType intType){
+            mcu::Regs::Uart::UartControlAndStatusRegB.setBitmask(static_cast<uint8_t>(intType));
+            /* Enable global interrupt (?)*/
+            sei();
+        }
+        void disable(UsartInterruptType intType){
+            mcu::Regs::Uart::UartControlAndStatusRegB.clearBitmask(static_cast<uint8_t>(intType));
+        }
+        void attach(UsartInterruptType intType, Callback callbackFunc){
+            switch (intType){
+                case UsartInterruptType::RxComplete       :rxCompleteCallback        = callbackFunc; break;
+                case UsartInterruptType::TxComplete       :txCompleteCallback        = callbackFunc; break;
+                case UsartInterruptType::DataRegisterEmpty: dataRegisterEmptyCallback= callbackFunc; break;
+                case UsartInterruptType::AllInterrupts: break;
+            }
+            /* Enable related interrupt*/
+            this->enable(intType);
+        }
+        void detach(UsartInterruptType intType){
+            switch (intType){
+                case UsartInterruptType::RxComplete       :rxCompleteCallback       = nullptr; break;
+                case UsartInterruptType::TxComplete       :txCompleteCallback       = nullptr; break;
+                case UsartInterruptType::DataRegisterEmpty:dataRegisterEmptyCallback= nullptr; break;
+                case UsartInterruptType::AllInterrupts: break;
+            }
+            /* Disable related interrupt*/
+            this->disable(intType);
+        }
+        void interruptHandler(UsartInterruptType intType){
+            switch (intType){
+                case UsartInterruptType::RxComplete       : if(rxCompleteCallback)        rxCompleteCallback()       ;break;
+                case UsartInterruptType::TxComplete       : if(txCompleteCallback)        txCompleteCallback()       ;break;
+                case UsartInterruptType::DataRegisterEmpty: if(dataRegisterEmptyCallback) dataRegisterEmptyCallback();break;
+            }
+        }
+    }static Interrupts;
     static void enableMultiprocessorMode(){
         Regs::Uart::UartControlAndStatusRegA.setBitmask(RegBits::Uart::UCSR0A_MPCM0);
     }
@@ -366,15 +370,15 @@ private:
         setStopBit(stopBit);
 
         /**/
-        attachInterrupt(UsartInterruptType::RxComplete, handleRxInterrupt);
-        attachInterrupt(UsartInterruptType::DataRegisterEmpty, handleTxInterrupt);
+        Interrupts.attach(UsartInterruptType::RxComplete, handleRxInterrupt);
+        Interrupts.attach(UsartInterruptType::DataRegisterEmpty, handleTxInterrupt);
 
         /* RX'i ve TX'i etkinleştir*/
         enableReceiver();
         enableTransmitter();
     }
     static void reset(){
-        disableInterrupt(UsartInterruptType::AllInterrupts);
+        Interrupts.disable(UsartInterruptType::AllInterrupts);
         disableReceiver();
         disableTransmitter();
         disableDoubleSpeed();
@@ -391,7 +395,7 @@ private:
         /* boş döngü, watchdog timer kullanilabilir*/
         while(txBuffer.isFull()){}
         txBuffer.push(data);
-        enableInterrupt(UsartInterruptType::DataRegisterEmpty);
+        Interrupts.enable(UsartInterruptType::DataRegisterEmpty);
     }
     static uint8_t readData(){
         uint8_t data = 0;
@@ -406,8 +410,8 @@ private:
 };
 };
 
-ISR(USART_UDRE_vect){Peripherals::Usart::interruptHandler(UsartInterruptType::DataRegisterEmpty);}
-ISR(USART_RX_vect)  {Peripherals::Usart::interruptHandler(UsartInterruptType::RxComplete);}
-ISR(USART_TX_vect)  {}
+ISR(USART_UDRE_vect){mcu::Peripherals::Usart::Interrupts.interruptHandler(UsartInterruptType::DataRegisterEmpty);}
+ISR(USART_RX_vect)  {mcu::Peripherals::Usart::Interrupts.interruptHandler(UsartInterruptType::RxComplete);}
+ISR(USART_TX_vect)  {mcu::Peripherals::Usart::Interrupts.interruptHandler(UsartInterruptType::TxComplete);}
 
 #endif //UART_HPP

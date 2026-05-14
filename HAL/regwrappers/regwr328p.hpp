@@ -2216,6 +2216,10 @@ input from this pin is not needed, this bit should be written logic one to reduc
 Note that ADC pins ADC7 and ADC6 do not have digital input buffers, and therefore do not require digital input disable bits.*/
             constexpr uint8_t DIDR0_ADC5D = (1 << ADC5D);
         }
+        namespace Ac{
+            constexpr uint8_t DIDR1_AIN0D  = (1 << AIN0D);
+            constexpr uint8_t DIDR1_AIN1D  = (1 << AIN1D);
+        }
         namespace Spi{
             /*SPSR*/
             /*Bit 7 – SPIF: SPI Interrupt Flag

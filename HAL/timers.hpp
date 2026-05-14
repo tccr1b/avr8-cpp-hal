@@ -159,7 +159,7 @@ namespace Timers{
                     case InterruptType::OutputCompareMatchB :compareMatchBCallback = callbackFunc; break;
                     case InterruptType::All:break;
                 }
-                enable(intType);
+                this->enable(intType);
             }
             void detach(InterruptType intType){
                 switch (intType){
@@ -170,7 +170,7 @@ namespace Timers{
                                                              compareMatchACallback= nullptr;
                                                              compareMatchBCallback= nullptr; break;
                 }
-                disable(intType);
+                this->disable(intType);
             }
             void handler(InterruptType intType){
                 switch (intType){
@@ -670,7 +670,7 @@ f.Enable interrupts, if needed.
                     case InterruptType::OutputCompareMatchB :cbCompareMatchBCallback = callbackFunc; break;
                     case InterruptType::All:break;
                 }
-                enable(intType);
+                this->enable(intType);
             }
             void detach(InterruptType intType){
                 switch (intType){
@@ -681,7 +681,7 @@ f.Enable interrupts, if needed.
                                                              cbCompareMatchACallback= nullptr;
                                                              cbCompareMatchBCallback= nullptr; break;
                 }
-                disable(intType);
+                this->disable(intType);
             }
             void handler(InterruptType intType){
                 switch (intType){

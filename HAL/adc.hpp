@@ -89,7 +89,17 @@ namespace Peripherals{
                                                                RegBits::Adc::ADMUX_MUX3);
         using Callback = void(*)();
         inline static Callback cbAdcConversionCompletedCallback = nullptr;
-
+        struct AutoTrig{
+            AutoTrig& selectSource(AdcAutoTriggerSource trigSrc){
+                mcu::Regs::Adc::AdcControlAndStatusRegB.writeMasked(static_cast<uint8_t>(trigSrc), ~bitmask_acsrb_trigger_sel_bits);
+                return *this;
+            }
+            AdcAutoTriggerSource getSource(){
+                return static_cast<AdcAutoTriggerSource>(Regs::Adc::AdcControlAndStatusRegB.getValue(bitmask_acsrb_trigger_sel_bits));
+            }
+            void enable(){mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);}
+            void disable(){mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);}
+        };
     public:
         struct{ //Interrupt
             void enable(){mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
@@ -98,6 +108,7 @@ namespace Peripherals{
             void detach(){cbAdcConversionCompletedCallback = nullptr; this->disable();}
             inline void handler(){if(cbAdcConversionCompletedCallback) cbAdcConversionCompletedCallback();}
         }static ConversionCompletedInterrupt;
+        static AutoTrig AutoTriggering;
         static void selectChannel(AdcChannel ch){
             mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ch), ~bitmask_admux_channel_sel_bits);
         }
@@ -111,17 +122,11 @@ namespace Peripherals{
         static AdcClock getAdcClockPrescaler(){
             return static_cast<AdcClock>(Regs::Adc::AdcControlAndStatusRegA.getValue(bitmask_acsra_prescaler_bits));
         }
-        static void selectAutoTriggerSource(AdcAutoTriggerSource trigSrc){
-            mcu::Regs::Adc::AdcControlAndStatusRegB.writeMasked(static_cast<uint8_t>(trigSrc), ~bitmask_acsrb_trigger_sel_bits);
-        }
-        static AdcAutoTriggerSource getAutoTriggerSource(){
-            return static_cast<AdcAutoTriggerSource>(Regs::Adc::AdcControlAndStatusRegB.getValue(bitmask_acsrb_trigger_sel_bits));
-        }
         static void selectReference(AdcReference ref){
             mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ref), ~bitmask_admux_ref_sel_bits);
         }
         static AdcReference getReference(){
-            return static_cast<AdcReference>(~bitmask_admux_ref_sel_bits & mcu::Regs::Adc::AdcMultiplexerSelectionReg.getValue());
+            return static_cast<AdcReference>(mcu::Regs::Adc::AdcMultiplexerSelectionReg.getValue(bitmask_admux_ref_sel_bits));
         }
         static void enableAdc(){
             /* The Power Reduction ADC bit, PRADC must be disabled by writing a logical zero to enable the ADC.*/
@@ -130,12 +135,6 @@ namespace Peripherals{
         }
         static void disableAdc(){
             Regs::Adc::AdcControlAndStatusRegA.clearBitmask(RegBits::Adc::ADCSRA_ADEN);
-        }
-        static void enableAutoTriggering(){
-            mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);
-        }
-        static void disableAutoTriggering(){
-            mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);
         }
         static void disableDigitalInputBuffer(AdcChannel adc_channel){
             uint8_t channel_pos = 1 << static_cast<uint8_t>(adc_channel);
@@ -177,15 +176,17 @@ namespace Peripherals{
 
 
 void foof(){
-    mcu::Peripherals::Adc::selectAutoTriggerSource(AdcAutoTriggerSource::FreeRunning);
-    mcu::Peripherals::Adc::selectAutoTriggerSource(AdcAutoTriggerSource::ExternalIRQ0);
-    mcu::Peripherals::Adc::selectAutoTriggerSource(AdcAutoTriggerSource::Timer1_CaptureEvent);
     mcu::Peripherals::Adc::setAdcClockPrescaler(AdcClock::DividedBy32);
     mcu::Peripherals::Adc::selectChannel(AdcChannel::InternalTempSensor);
-    mcu::Peripherals::Adc::selectAutoTriggerSource(AdcAutoTriggerSource::FreeRunning);
     mcu::Peripherals::Adc::disableDigitalInputBuffer(AdcChannel::No0);
     mcu::Peripherals::Adc::getActiveChannel();
     mcu::Peripherals::Adc::selectChannel(AdcChannel::No7);
+    mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::FreeRunning);
+    mcu::Peripherals::Adc::AutoTriggering.enable();
+    mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::ExternalIRQ0).enable();
+    mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::Timer0_Overflow).enable();
+    mcu::Peripherals::Adc::enableAdc();
+    mcu::Peripherals::Adc::read();
 }
 
 ISR(ADC_vect){mcu::Peripherals::Adc::ConversionCompletedInterrupt.handler();}

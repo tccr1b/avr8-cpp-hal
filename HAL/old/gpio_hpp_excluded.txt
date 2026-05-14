@@ -1,0 +1,148 @@
+namespace HAL{  /* Class VirtualPort_t */
+    class VirtualPort_t{
+    public:
+        struct PinConfig{
+            volatile uint8_t DataDirectionReg;
+            volatile uint8_t PortReg;
+            volatile uint8_t InputReg;
+            uint8_t bit;
+        };
+        enum class Mode : uint8_t{
+            Input           = 0,
+            Output          = 1,
+            HighImpedance   = 2
+        };
+    private:
+        PinConfig* vPortPins;
+        uint8_t vPortPinCount;
+    public:
+        VirtualPort_t(PinConfig* pinArray, uint8_t count);
+        void setPortMode(Mode port_mode);
+        Mode getPortMode();
+        void enableInputPullUps();
+        void disableInputPullUps();
+        bool isPullUpsEnabled();
+        uint8_t read();
+        uint8_t readBit();
+        void write(uint8_t data);
+        void writeBit(uint8_t index, uint8_t state);
+        void toggleBit(uint8_t index);
+
+        ~VirtualPort_t();
+    };
+    
+    VirtualPort_t::VirtualPort_t(PinConfig* pinArray, uint8_t count){
+        vPortPins = pinArray;
+        vPortPinCount = count;
+    }
+    void VirtualPort_t::setPortMode(Mode port_mode){
+        switch (port_mode){
+        case Mode::Output:
+            for(uint8_t i = 0; i < vPortPinCount; i++){
+                vPortPins[i].PortReg &= ~(vPortPins[i].bit);
+                vPortPins[i].DataDirectionReg |= (vPortPins[i].bit);
+            }
+            break;
+        case Mode::Input:
+            for(uint8_t i = 0; i < vPortPinCount; i++){
+                vPortPins[i].PortReg &= ~(vPortPins[i].bit);
+                vPortPins[i].DataDirectionReg &= ~(vPortPins[i].bit);
+            }
+            break;
+        case Mode::HighImpedance:
+            for(uint8_t i = 0; i < vPortPinCount; i++){
+                vPortPins[i].DataDirectionReg &= ~(vPortPins[i].bit);
+                vPortPins[i].PortReg &= ~(vPortPins[i].bit);
+            }
+            break;
+        }
+    }
+    VirtualPort_t::Mode VirtualPort_t::getPortMode(){}
+    void VirtualPort_t::enableInputPullUps(){
+        /* VirtualPort'un durumunu kontrol et, giriş değilse işlem yapmadan çık.*/
+        if(Mode::Input != getPortMode()) return;
+        /* MCUCR'deki PUD bitini resetle*/
+        Regs::Core::McuControlReg.clearBitmask(RegBits::Core::MCUCR_PUD);
+        /* Tüm Pinleri ayarla*/
+        for(uint8_t i = 0; i < vPortPinCount; i++){vPortPins[i].PortReg |= (vPortPins[i].bit);}
+    }
+    void VirtualPort_t::disableInputPullUps(){
+        /* VirtualPort'un durumunu kontrol et, giriş değilse işlem yapmadan çık.*/
+        if(Mode::Input != getPortMode()) return;
+        /* Tüm pinleri ayarla*/
+        for(uint8_t i = 0; i < vPortPinCount; i++){vPortPins[i].PortReg &= ~(vPortPins[i].bit);}
+    }
+    bool VirtualPort_t::isPullUpsEnabled(){}
+    uint8_t VirtualPort_t::read(){}
+    uint8_t VirtualPort_t::readBit(){}
+    void VirtualPort_t::write(uint8_t data){}
+    void VirtualPort_t::writeBit(uint8_t index, uint8_t state){}
+    void VirtualPort_t::toggleBit(uint8_t index){}
+    VirtualPort_t::~VirtualPort_t(){}
+}; // namespace HAL
+
+namespace HAL{  /* Struct GpioPort_t & Pin_t*/
+struct GpioPort_t{
+    volatile uint8_t DataDirectionReg;
+    volatile uint8_t PortReg;
+    volatile uint8_t InputReg;
+};
+struct Pin_t{
+    public:
+    GpioPort_t* PinPort;
+    uint8_t pinPosBitmask;
+
+    void setPinMode(PinMode pin_mode){
+        switch (pin_mode){
+        case HAL::PinMode::Input:
+            PinPort->PortReg &= ~pinPosBitmask;
+            PinPort->DataDirectionReg &= ~pinPosBitmask;
+            break;
+        case HAL::PinMode::Output:
+            PinPort->PortReg &= ~pinPosBitmask;
+            PinPort->DataDirectionReg |= pinPosBitmask;
+            break;
+        case HAL::PinMode::HighImpedance:
+            PinPort->DataDirectionReg &= ~pinPosBitmask;
+            PinPort->PortReg &= ~pinPosBitmask;
+            break;
+        }
+    }
+    PinMode getPinMode(){
+        if(PinPort->DataDirectionReg & pinPosBitmask){
+            return PinMode::Output;
+        }else{
+            if(PinPort->PortReg & pinPosBitmask){
+                return PinMode::Input;
+            }else{
+                return PinMode::HighImpedance;
+            }
+        }
+    }
+    bool enableInputPullUp(){
+        if(PinMode::Input != getPinMode()) return false;
+        Regs::Core::McuControlReg.clearBitmask(RegBits::Core::MCUCR_PUD);
+        PinPort->PortReg |= pinPosBitmask;
+        return true;
+    }
+    bool disableInputPullUp(){
+        if(getPinMode() != PinMode::Input) return false;
+        PinPort->PortReg &= ~pinPosBitmask;
+        return true;
+    }
+    bool isPullUpEnabled(){
+        return (!Regs::Core::McuControlReg.readBit(RegBits::Core::MCUCR_PUD) && 
+                !(PinPort->DataDirectionReg & pinPosBitmask) && 
+                (PinPort->PortReg & pinPosBitmask));
+    }
+    uint8_t getDataDirRegAddr(){return PinPort->DataDirectionReg;}
+    uint8_t getPortRegAddr()   {return PinPort->PortReg;}
+    uint8_t getInputRegAddr()  {return PinPort->InputReg;}
+
+    void inline low()    {if(PinMode::Output == getPinMode()) PinPort->PortReg &= ~pinPosBitmask;}
+    void inline high()   {if(PinMode::Output == getPinMode()) PinPort->PortReg |= pinPosBitmask;}
+    void inline toggle() {if(PinMode::Output == getPinMode()) PinPort->PortReg ^= pinPosBitmask;}
+    bool inline read()   {__asm__("nop"); return PinPort->InputReg & pinPosBitmask;}
+
+};
+}; // namespace HAL
