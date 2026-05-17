@@ -9,7 +9,7 @@
 #include "HAL/serialstream.hpp"
 #include "HAL/spi.hpp"
 #include "HAL/adc.hpp"
-//#include "HAL/twi.hpp"
+#include "HAL/twi.hpp"
 //#include "HAL/utils.hpp"
 //#include "HAL/eeprom.hpp"
 #include "HAL/timers.hpp"
@@ -43,7 +43,7 @@ void timerCallback(){
 
 int main (){    
 //    cstd::cout << "--------------" << cstd::endl;
-    mcu::System::Clock::setClockPrescaler(Prescaler::NoDivision);
+    mcu::System::Clock::setClockPrescaler(SysClock::NoDivision);
     
     _delay_ms(10);
     mcu::Peripherals::Usart::init(UsartMode::Asynchronous,
@@ -56,17 +56,17 @@ int main (){
     mcu::System::WatchdogTimer::enable(WatchdogMode::InterruptAndSystemReset, WatchdogTimeout::_4sec);
     sei();
     mcu::System::WatchdogTimer::disable();
-    togglingPin::setPinMode(HAL::PinMode::Output);
+    togglingPin::setPinMode(PinMode::Output);
 
     // FASTPWM_WITHOCR
-//    using t0 = mcu::Timers::Timer0;
-//    t0::init(t0::Mode::FastPWM_WithOCR, t0::Clock::NoPrescaling);
-//    t0::enableOutputComparePinB();
-//    t0::enableOutputComparePinA();
-//    t0::setOutputModePinA(t0::OutputMode::TogglePinOnCompareMatch);
-//    t0::setOutputModePinB(t0::OutputMode::ClearPinOnCompareMatch);
-//    t0::setCompareValueA(200);
-//    t0::setCompareValueB(0);
+    using t0 = mcu::Timers::Timer0;
+    t0::init(t0::Mode::FastPWM_WithOCR, t0::Clock::NoPrescaling);
+    t0::ChannelB.enable();
+    t0::ChannelA.enable();
+    t0::ChannelA.setOutputMode(t0::OutputMode::TogglePinOnCompareMatch);
+    t0::ChannelB.setOutputMode(t0::OutputMode::ClearPinOnCompareMatch);
+    t0::setCompareValueA(200);
+    t0::setCompareValueB(0);
 
     // FASTPWM
 //    using t0 = mcu::Timers::Timer0;
@@ -98,25 +98,27 @@ int main (){
 //    mcu::Timers::Timer0::ChannelA.setOutputMode(timer0::OutputMode::DisconnectedFromPin);
 //    timer0::ChannelA.setOutputMode(timer0::OutputMode::DisconnectedFromPin);
     
-    
+    using twi = mcu::Peripherals::Twi;
+    twi::TwiInterrupt.clearFlag();
+
     using timer0 = mcu::Timers::Timer0;
     timer0::init(timer0::Mode::FastPWM, timer0::Clock::DividedBy1024);
-    timer0::ChannelA.setOutputMode(timer0::OutputMode::ClearPinOnCompareMatch);
     timer0::setCompareValueA(127);
-    timer0::ChannelA.enable();
-    timer0::Interrupts.attach(timer0::InterruptType::OutputCompareMatchA, timerCallback);    
+    timer0::ChannelA.setOutputMode(timer0::OutputMode::ClearPinOnCompareMatch).enable();
+    timer0::Interrupts.attach(timer0::InterruptType::OutputCompareMatchA, timerCallback).enable();
+    timer0::Interrupts.disable(timer0::InterruptType::OutputCompareMatchA);
+    timer0::Interrupts.detach(timer0::InterruptType::OutputCompareMatchA).disable();
+    timer0::Interrupts.enable(timer0::InterruptType::All);
 
 
     using t1 = mcu::Timers::Timer1;
     t1::init(t1::Mode::FastPWM_10bit, t1::Clock::NoPrescaling);
-    t1::ChannelA.setOutputMode(t1::OutputMode::ClearOnCompareMatch);
-    t1::ChannelA.enable();
+    t1::ChannelA.setOutputMode(t1::OutputMode::ClearOnCompareMatch).enable();
 
     using t2 = mcu::Timers::Timer2;
     t2::init(t2::Mode::FastPWM, t2::Clock::DividedBy8, t2::ClockSource::SystemClock);
-    t2::ChannelA.setOutputMode(t2::OutputMode::ClearOnCompareMatch);
-    t2::ChannelA.enable();
     t2::setCompareValueA(32);
+    t2::ChannelA.setOutputMode(t2::OutputMode::ClearOnCompareMatch).enable();
     t2::ChannelB.setOutputMode(t2::OutputMode::DisconnectedFromPin);
 
     uint8_t duty = 1;
@@ -137,7 +139,15 @@ int main (){
     mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::ExternalIRQ0).enable();
     
     mcu::Peripherals::AnalogComp::Interrupt.selectMode(AcInterruptMode::InterruptOnRisingOutputEdge);
-    
+    mcu::Peripherals::AnalogComp::Interrupt.attach(sysReset).enable();
+
+    using Comparator = mcu::Peripherals::AnalogComp;
+    Comparator::Interrupt.selectMode(AcInterruptMode::InterruptOnFallingOutputEdge).attach(timerCallback).enable();
+    Comparator::disableDigitalInputBuffer(AcInput::Ain0);
+    Comparator::setNegativeInputA1(AcA1Channel::AdcChNo0);
+    Comparator::setPositiveInputA0(AcA0Channel::Ain0Pin);
+    Comparator::enable();
+
     while(1){
 //        mcu::System::WatchdogTimer::reset();
         /* ArduinoUnoR3Pin:9 (PB1)*/

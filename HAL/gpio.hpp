@@ -9,28 +9,13 @@
 
 using namespace mcu;
 
+enum class PinMode : uint8_t{
+    Input           = 0,
+    Output          = 1,
+    HighImpedance   = 2
+};
+
 namespace HAL{  /* Template GpioPort & GpioPin*/
-/* Kullanım:
-    // Şablon Parametreleri:
-    // 1. PortReg: PORT Register'ı (Örn: Regs::PORTB)
-    // 2. DdrReg : DDR Register'ı  (Örn: Regs::DDRB)
-    // 3. PinReg : PIN Register'ı  (Örn: Regs::PINB)
-    // 4. PinBit : Pin Numarası    (Örn: 5)
-    //  HAL::GpioPin<PORTx,DDRx,PINx,pinMask>
-
-using namespace mcu;
-
-using anyPort= HAL::GpioPort<decltype(Regs::Gpio::PortRegX),
-                             decltype(Regs::Gpio::DataDirectionRegX),
-                             decltype(Regs::Gpio::InputPinAddrX)>;
-
-using anyPin = HAL::GpioPin<anyPort, RegBits::Gpio::PortX::PB_n>;
-*/
-    enum class PinMode : uint8_t{
-        Input           = 0,
-        Output          = 1,
-        HighImpedance   = 2
-    };
 
     template<typename regDDRx, typename regPORTx, typename regPINx>
     struct GpioPort{
@@ -148,22 +133,11 @@ using anyPin = HAL::GpioPin<anyPort, RegBits::Gpio::PortX::PB_n>;
                 }
                 bitPos++;
             }(), ...);
-
-            /* Lambda Function and Fold Expression (...)
-            ([&](auto Pin){
-                if(data & (1 << bitPos)) Pin.setHigh();
-                else Pin.setLow();
-                bitPos++;
-            }(Pins{}), ...);
-            */
         }
         static uint16_t read(){
             uint16_t result = 0x0000;
             uint8_t bitPos  = 0;
 
-            /* Lambda Function and Fold Expression (...)
-            ([&](){}(), ...);
-            */
             ([&]{
                 if(Pins::read()){result |= (1 << bitPos);}
                 bitPos++;
@@ -193,7 +167,6 @@ using GpioPortD = HAL::GpioPort<decltype(Regs::Gpio::DataDirectionRegD), // DDRx
                                 decltype(Regs::Gpio::PortRegD),          // PORTx
                                 decltype(Regs::Gpio::InputPinAddrD)>;    // PINx
 /* PORTB PINS*/
-
 using PinPB0    = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_0>;
 using PinPB1    = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_1>;
 using PinPB2    = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_2>;

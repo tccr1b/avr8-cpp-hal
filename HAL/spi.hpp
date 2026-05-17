@@ -25,15 +25,15 @@ MyProject/
 
 using namespace mcu;
 
-enum class SpiClockSpeed    : uint8_t {
+enum class SpiClock         : uint8_t {
     /*SPI2X ve SPR0 ve SPR1 bitleri farklı registerlerde bulunduğu için, SPI2X bitini aynı değişkende 2 bit sola kaydırdık (0x04)*/
-    dividedBy2   = (RegBits::Spi::SPSR_SPI2X << 2),   // 0b0000 0001 --> 0b0000 0100(mask) 0x04
-    dividedBy4   = 0x00,
-    dividedBy8   = (RegBits::Spi::SPSR_SPI2X << 2) | RegBits::Spi::SPCR_SPR0, //0b0000 0101
-    dividedBy16  = RegBits::Spi::SPCR_SPR0,
-    dividedBy32  = (RegBits::Spi::SPSR_SPI2X << 2) | RegBits::Spi::SPCR_SPR1,
-    dividedBy64  = RegBits::Spi::SPCR_SPR1,
-    dividedBy128 = RegBits::Spi::SPCR_SPR0 | RegBits::Spi::SPCR_SPR1,
+    DividedBy2   = (RegBits::Spi::SPSR_SPI2X << 2),   // 0b0000 0001 --> 0b0000 0100(mask) 0x04
+    DividedBy4   = 0x00,
+    DividedBy8   = (RegBits::Spi::SPSR_SPI2X << 2) | RegBits::Spi::SPCR_SPR0, //0b0000 0101
+    DividedBy16  = RegBits::Spi::SPCR_SPR0,
+    DividedBy32  = (RegBits::Spi::SPSR_SPI2X << 2) | RegBits::Spi::SPCR_SPR1,
+    DividedBy64  = RegBits::Spi::SPCR_SPR1,
+    DividedBy128 = RegBits::Spi::SPCR_SPR0 | RegBits::Spi::SPCR_SPR1,
 };
 enum class SpiClockPolarity : uint8_t {
     /*CPOL is set to high (Default: High)*/
@@ -65,7 +65,7 @@ namespace Peripherals{
 class Spi{
 private:
     using Callback = void(*)();
-    inline static Callback interruptCallback = nullptr;
+    inline static Callback cbTransferCompletedCallback = nullptr;
     inline static HAL::RingBuffer<uint8_t, TX_BUFFER_SIZE> txBuffer;
     inline static HAL::RingBuffer<uint8_t, RX_BUFFER_SIZE> rxBuffer;
 
@@ -90,10 +90,10 @@ public:
     struct{ //SPI Interrupt
         void enable() {Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPIE);}
         void disable(){Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_SPIE);}
-        void attach(Callback cbFunc){interruptCallback = cbFunc; this->enable();}
-        void detach() {interruptCallback = nullptr; this->disable();}
-        void handle() {if(interruptCallback) interruptCallback();}
-    }static SpiInterrupt;
+        void attach(Callback cbFunc){cbTransferCompletedCallback = cbFunc; this->enable();}
+        void detach() {cbTransferCompletedCallback = nullptr; this->disable();}
+        void handle() {if(cbTransferCompletedCallback) cbTransferCompletedCallback();}
+    }static TransferCompletedInterrupt;
     inline static bool isEnabled(){
         return Regs::Spi::SpiControlReg.readBit(RegBits::Spi::SPCR_SPE) && 
                !Regs::Core::PowerReductionReg.readBit(RegBits::Core::PRR_PRSPI);
@@ -108,25 +108,25 @@ public:
         Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPE);
     }
     static void init(SpiMode spiMode = SpiMode::Master,
-                     SpiClockSpeed speed = SpiClockSpeed::dividedBy64,
+                     SpiClock speed = SpiClock::DividedBy64,
                      SpiDataMode spiDataMode = SpiDataMode::Mode0){
         switch (spiMode){
         case SpiMode::Slave:
             /* Configure SPI pins for slave mode*/
-            mcu::Gpio::PinMISO::setPinMode(HAL::PinMode::Output);
-            mcu::Gpio::PinMOSI::setPinMode(HAL::PinMode::Input);
-            mcu::Gpio::PinSCK::setPinMode(HAL::PinMode::Input);
-            mcu::Gpio::PinSS::setPinMode(HAL::PinMode::Input);
+            mcu::Gpio::PinMISO::setPinMode(PinMode::Output);
+            mcu::Gpio::PinMOSI::setPinMode(PinMode::Input);
+            mcu::Gpio::PinSCK::setPinMode(PinMode::Input);
+            mcu::Gpio::PinSS::setPinMode(PinMode::Input);
             break;
         case SpiMode::Master:
             /* Configure SPI pins for master mode. Avoid configuring SS pin as input*/
-            mcu::Gpio::PinMISO::setPinMode(HAL::PinMode::Input);
-            mcu::Gpio::PinMOSI::setPinMode(HAL::PinMode::Output);
-            mcu::Gpio::PinSCK::setPinMode(HAL::PinMode::Output);
+            mcu::Gpio::PinMISO::setPinMode(PinMode::Input);
+            mcu::Gpio::PinMOSI::setPinMode(PinMode::Output);
+            mcu::Gpio::PinSCK::setPinMode(PinMode::Output);
 
             /* If SS is configured as an output, the pin is a general output pin which 
             does not affect the SPI system.*/
-            mcu::Gpio::PinSS::setPinMode(HAL::PinMode::Output);
+            mcu::Gpio::PinSS::setPinMode(PinMode::Output);
 
             uint8_t speedMask = static_cast<uint8_t>(speed);
             if(speedMask & 0x04){
@@ -161,7 +161,7 @@ public:
             Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_DORD);
         }
     }
-    static void setTransferSpeed(SpiClockSpeed spiSpeed){
+    static void setSpiClockPrescaler(SpiClock spiSpeed){
         uint8_t speedMask = static_cast<uint8_t>(spiSpeed);
         if(speedMask & 0x04){
             Regs::Spi::SpiStatusReg.setBitmask(RegBits::Spi::SPSR_SPI2X);
@@ -193,6 +193,6 @@ public:
 } // namespace mcu
 
 /* SPI Transfer Complete interrupt*/
-ISR(SPI_STC_vect){mcu::Peripherals::Spi::SpiInterrupt.handle();}
+ISR(SPI_STC_vect){mcu::Peripherals::Spi::TransferCompletedInterrupt.handle();}
 
 #endif //SPI_HPP

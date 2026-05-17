@@ -143,6 +143,32 @@ struct Pin_t{
     void inline high()   {if(PinMode::Output == getPinMode()) PinPort->PortReg |= pinPosBitmask;}
     void inline toggle() {if(PinMode::Output == getPinMode()) PinPort->PortReg ^= pinPosBitmask;}
     bool inline read()   {__asm__("nop"); return PinPort->InputReg & pinPosBitmask;}
+/* Kullanım:
+    // Şablon Parametreleri:
+    // 1. PortReg: PORT Register'ı (Örn: Regs::PORTB)
+    // 2. DdrReg : DDR Register'ı  (Örn: Regs::DDRB)
+    // 3. PinReg : PIN Register'ı  (Örn: Regs::PINB)
+    // 4. PinBit : Pin Numarası    (Örn: 5)
+    //  HAL::GpioPin<PORTx,DDRx,PINx,pinMask>
 
+using namespace mcu;
+
+using anyPort= HAL::GpioPort<decltype(Regs::Gpio::PortRegX),
+                             decltype(Regs::Gpio::DataDirectionRegX),
+                             decltype(Regs::Gpio::InputPinAddrX)>;
+
+using anyPin = HAL::GpioPin<anyPort, RegBits::Gpio::PortX::PB_n>;
+*/
+
+            /* Lambda Function and Fold Expression (...)
+            ([&](){}(), ...);
+            */
+            /* Lambda Function and Fold Expression (...)
+            ([&](auto Pin){
+                if(data & (1 << bitPos)) Pin.setHigh();
+                else Pin.setLow();
+                bitPos++;
+            }(Pins{}), ...);
+            */
 };
 }; // namespace HAL

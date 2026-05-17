@@ -36,14 +36,14 @@ namespace System{
         private:
             inline static WatchdogMode currentWdtMode;
             using Callback = void(*)();
-            inline static Callback interruptCallback = nullptr;
+            inline static Callback cbInterruptCallback = nullptr;
             inline static WatchdogTimeout wdTimeout = WatchdogTimeout::_8sec;
             inline static WatchdogMode wdMode = WatchdogMode::SystemReset;
         public:
             struct{
-                void attach(Callback cb){interruptCallback = cb;}
-                void detach(){interruptCallback = nullptr;}
-                void handle(){if(interruptCallback) interruptCallback();}
+                void attach(Callback cb){cbInterruptCallback = cb;}
+                void detach(){cbInterruptCallback = nullptr;}
+                void handle(){if(cbInterruptCallback) cbInterruptCallback();}
             }static Interrupt;
             static void setTimeOut(WatchdogTimeout wdtTimeout){
                 /* Prepare new values for writing fast as much as possible*/

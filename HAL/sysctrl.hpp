@@ -19,7 +19,7 @@ enum class SleepMode : uint8_t{
     StandBy           = RegBits::Core::SMCR_SM2 | RegBits::Core::SMCR_SM1,
     ExtendedStandBy   = RegBits::Core::SMCR_SM2 | RegBits::Core::SMCR_SM1 | RegBits::Core::SMCR_SM0,
 };
-enum class Prescaler : uint8_t{
+enum class SysClock  : uint8_t{
     NoDivision  = 0x00,
     DividedBy2  = RegBits::Core::CLKPR_CLKPS0,
     DividedBy4  = RegBits::Core::CLKPR_CLKPS1,
@@ -86,6 +86,18 @@ inline static void sleep(){
     __asm__ __volatile__ ("sleep");
 }
 
+struct BaseInterrupt{
+    void enable(){}
+    void disable(){}
+    void attach(){}
+    void detach(){}
+    void handle(){}
+};
+
+struct : BaseInterrupt {
+        void selectSensing(){}
+        void clearFlag(){}
+} static ExtInterrupt0;
 static void enableExternalInterrupt0(){
     Regs::Core::ExternalInterruptMaskReg.setBitmask(RegBits::Core::EIMSK_INT0);
 }
@@ -158,7 +170,7 @@ public:
 
 class Clock{
 public:
-    static void         setClockPrescaler(Prescaler prescalerValue){
+    static void         setClockPrescaler(SysClock prescalerValue){
         /* Save status reg and disable global interrupts*/
         uint8_t sreg = Regs::Core::StatusReg;
         cli();
@@ -169,13 +181,13 @@ public:
         /* Restore status reg */
         Regs::Core::StatusReg.setValue(sreg);
     }
-    static Prescaler    getClockPrescaler(){
+    static SysClock    getClockPrescaler(){
         constexpr uint8_t bitmask_clk_prescaler = RegBits::Core::CLKPR_CLKPS3| 
                                                   RegBits::Core::CLKPR_CLKPS2|
                                                   RegBits::Core::CLKPR_CLKPS1|
                                                   RegBits::Core::CLKPR_CLKPS0;
         uint8_t currentPrescaler = (uint8_t)(Regs::Core::ClockPrescaleReg) & bitmask_clk_prescaler;                                                  
-        return static_cast<Prescaler>(currentPrescaler);
+        return static_cast<SysClock>(currentPrescaler);
     }
     static uint32_t     getCpuFrequency(){
         return (F_CPU >> static_cast<uint8_t>(getClockPrescaler()));

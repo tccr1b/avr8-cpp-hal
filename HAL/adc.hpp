@@ -97,8 +97,9 @@ namespace Peripherals{
             AdcAutoTriggerSource getSource(){
                 return static_cast<AdcAutoTriggerSource>(Regs::Adc::AdcControlAndStatusRegB.getValue(bitmask_acsrb_trigger_sel_bits));
             }
-            void enable(){mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);}
-            void disable(){mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);}
+            void enable   (){mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);}
+            void disable  (){mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADATE);}
+            [[nodiscard]] bool isEnabled(){return mcu::Regs::Adc::AdcControlAndStatusRegA.readBit(mcu::RegBits::Adc::ADCSRA_ADATE);}
         };
     public:
         struct{ //Interrupt
@@ -110,9 +111,13 @@ namespace Peripherals{
         }static ConversionCompletedInterrupt;
         static AutoTrig AutoTriggering;
         static void selectChannel(AdcChannel ch){
+            bool auto_trg_flag = false;
+            if(AutoTriggering.isEnabled()){AutoTriggering.disable(); auto_trg_flag = true;}
             mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ch), ~bitmask_admux_channel_sel_bits);
+            auto_trg_flag ? AutoTriggering.enable() : AutoTriggering.disable();
         }
         static AdcChannel getActiveChannel(){
+            /* ??????????????*/
             return static_cast<AdcChannel>(Regs::Adc::AdcMultiplexerSelectionReg.getValue(bitmask_admux_channel_sel_bits));
         }
         static void setAdcClockPrescaler(AdcClock adcPresc){
@@ -123,7 +128,10 @@ namespace Peripherals{
             return static_cast<AdcClock>(Regs::Adc::AdcControlAndStatusRegA.getValue(bitmask_acsra_prescaler_bits));
         }
         static void selectReference(AdcReference ref){
+            bool auto_trg_flag = false;
+            if(AutoTriggering.isEnabled()){AutoTriggering.disable(); auto_trg_flag = true;}
             mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ref), ~bitmask_admux_ref_sel_bits);
+            auto_trg_flag ? AutoTriggering.enable() : AutoTriggering.disable();
         }
         static AdcReference getReference(){
             return static_cast<AdcReference>(mcu::Regs::Adc::AdcMultiplexerSelectionReg.getValue(bitmask_admux_ref_sel_bits));

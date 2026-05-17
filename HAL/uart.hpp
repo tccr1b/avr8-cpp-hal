@@ -87,9 +87,9 @@ class Usart{
 private:
     static inline UsartBaudrate currentBaudrate = UsartBaudrate::_9600bps;
     using Callback = void(*)();
-    inline static Callback rxCompleteCallback = nullptr;
-    inline static Callback txCompleteCallback = nullptr;
-    inline static Callback dataRegisterEmptyCallback  = nullptr;
+    inline static Callback cbRxCompleteCallback = nullptr;
+    inline static Callback cbTxCompleteCallback = nullptr;
+    inline static Callback cbDataRegisterEmptyCallback  = nullptr;
     static inline HAL::RingBuffer<uint8_t, TX_BUFFER_SIZE> txBuffer;
     static inline HAL::RingBuffer<uint8_t, RX_BUFFER_SIZE> rxBuffer;
 
@@ -294,9 +294,9 @@ private:
         }
         void attach(UsartInterruptType intType, Callback callbackFunc){
             switch (intType){
-                case UsartInterruptType::RxComplete       :rxCompleteCallback        = callbackFunc; break;
-                case UsartInterruptType::TxComplete       :txCompleteCallback        = callbackFunc; break;
-                case UsartInterruptType::DataRegisterEmpty: dataRegisterEmptyCallback= callbackFunc; break;
+                case UsartInterruptType::RxComplete       :cbRxCompleteCallback        = callbackFunc; break;
+                case UsartInterruptType::TxComplete       :cbTxCompleteCallback        = callbackFunc; break;
+                case UsartInterruptType::DataRegisterEmpty:cbDataRegisterEmptyCallback = callbackFunc; break;
                 case UsartInterruptType::AllInterrupts: break;
             }
             /* Enable related interrupt*/
@@ -304,19 +304,21 @@ private:
         }
         void detach(UsartInterruptType intType){
             switch (intType){
-                case UsartInterruptType::RxComplete       :rxCompleteCallback       = nullptr; break;
-                case UsartInterruptType::TxComplete       :txCompleteCallback       = nullptr; break;
-                case UsartInterruptType::DataRegisterEmpty:dataRegisterEmptyCallback= nullptr; break;
-                case UsartInterruptType::AllInterrupts: break;
+                case UsartInterruptType::RxComplete       :cbRxCompleteCallback       = nullptr; break;
+                case UsartInterruptType::TxComplete       :cbTxCompleteCallback       = nullptr; break;
+                case UsartInterruptType::DataRegisterEmpty:cbDataRegisterEmptyCallback= nullptr; break;
+                case UsartInterruptType::AllInterrupts    :cbRxCompleteCallback       = nullptr;
+                                                           cbTxCompleteCallback       = nullptr;
+                                                           cbDataRegisterEmptyCallback= nullptr; break;
             }
             /* Disable related interrupt*/
             this->disable(intType);
         }
-        void interruptHandler(UsartInterruptType intType){
+        void handle(UsartInterruptType intType){
             switch (intType){
-                case UsartInterruptType::RxComplete       : if(rxCompleteCallback)        rxCompleteCallback()       ;break;
-                case UsartInterruptType::TxComplete       : if(txCompleteCallback)        txCompleteCallback()       ;break;
-                case UsartInterruptType::DataRegisterEmpty: if(dataRegisterEmptyCallback) dataRegisterEmptyCallback();break;
+                case UsartInterruptType::RxComplete       : if(cbRxCompleteCallback)        cbRxCompleteCallback()       ;break;
+                case UsartInterruptType::TxComplete       : if(cbTxCompleteCallback)        cbTxCompleteCallback()       ;break;
+                case UsartInterruptType::DataRegisterEmpty: if(cbDataRegisterEmptyCallback) cbDataRegisterEmptyCallback();break;
             }
         }
     }static Interrupts;
@@ -410,8 +412,8 @@ private:
 };
 };
 
-ISR(USART_UDRE_vect){mcu::Peripherals::Usart::Interrupts.interruptHandler(UsartInterruptType::DataRegisterEmpty);}
-ISR(USART_RX_vect)  {mcu::Peripherals::Usart::Interrupts.interruptHandler(UsartInterruptType::RxComplete);}
-ISR(USART_TX_vect)  {mcu::Peripherals::Usart::Interrupts.interruptHandler(UsartInterruptType::TxComplete);}
+ISR(USART_UDRE_vect){mcu::Peripherals::Usart::Interrupts.handle(UsartInterruptType::DataRegisterEmpty);}
+ISR(USART_RX_vect)  {mcu::Peripherals::Usart::Interrupts.handle(UsartInterruptType::RxComplete);}
+ISR(USART_TX_vect)  {mcu::Peripherals::Usart::Interrupts.handle(UsartInterruptType::TxComplete);}
 
 #endif //UART_HPP

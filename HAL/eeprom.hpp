@@ -39,21 +39,19 @@ namespace mcu{
 class Eeprom{
 private:
     using Callback = void(*)();
-    inline static Callback interruptCallbackEepromReady = nullptr;
+    inline static Callback cbEepromReadyCallback = nullptr;
     static inline bool isReady(){
         while(Regs::Eeprom::EepromControlReg.readBit(RegBits::Eeprom::EECR_EEPE));
         return true;
     }
 public:
-    static void detachEepromReadyInterrupt(){
-        interruptCallbackEepromReady = nullptr;
-    };
-    static void attachEepromReadyInterrupt(Callback cbFunc){
-        interruptCallbackEepromReady = cbFunc;
-    }
-    static void interruptHandler(){
-        if(interruptCallbackEepromReady) interruptCallbackEepromReady();
-    }
+    struct{ //Interrupt
+        void enable() {Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERIE);}
+        void disable(){Regs::Eeprom::EepromControlReg.clearBitmask(RegBits::Eeprom::EECR_EERIE);}
+        void attach(Callback cbFunc){cbEepromReadyCallback = cbFunc;}
+        void detach() {cbEepromReadyCallback = nullptr;}
+        void handle() {if(cbEepromReadyCallback) cbEepromReadyCallback();}
+    }static EepromReadyInterrupt;
     static void enable(EepromFeature feat){
         Regs::Eeprom::EepromControlReg.setBitmask(static_cast<uint8_t>(feat));
     }
@@ -123,6 +121,6 @@ public:
 }// namespace mcu
 
 /* Eeprom Ready Interrupt*/
-ISR(EE_READY_vect){mcu::Eeprom::interruptHandler();}
+ISR(EE_READY_vect){mcu::Eeprom::EepromReadyInterrupt.handle();}
 
 #endif //EEPROM_HPP

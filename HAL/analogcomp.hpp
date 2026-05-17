@@ -46,22 +46,24 @@ namespace Peripherals{
 
         constexpr static uint8_t bitmask_acsr_int_mode_bits     = (RegBits::Adc::ACSR_ACIS0|
                                                                    RegBits::Adc::ACSR_ACIS1);
-        using Callback = void(*)();
+        using Callback = void(*)(void);
         inline static Callback cbAcCallback = nullptr;
 //        inline static bool currentIntStatus;
+        struct AcInterrupt{
+            void enable() {Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACIE);}
+            void disable(){Regs::Adc::AnalogComparatorControlAndStatusReg.clearBitmask(RegBits::Adc::ACSR_ACIE);}
+            inline bool  isEnabled(){return Regs::Adc::AnalogComparatorControlAndStatusReg.readBit(RegBits::Adc::ACSR_ACIE);}
+            AcInterrupt& attach(Callback cbFunc){cbAcCallback = cbFunc; return *this;}
+            AcInterrupt& detach(){cbAcCallback = nullptr; return *this;}
+            inline void  handle(){if(cbAcCallback) cbAcCallback();}
+            AcInterrupt& selectMode(AcInterruptMode ac_int_mode){
+                Regs::Adc::AnalogComparatorControlAndStatusReg.writeMasked(static_cast<uint8_t>(ac_int_mode), ~bitmask_acsr_int_mode_bits);
+                return *this;
+            }
+        };
 
     public:
-        struct{ //Interrupts
-            inline void enable(){Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACIE);}
-            inline void disable(){Regs::Adc::AnalogComparatorControlAndStatusReg.clearBitmask(RegBits::Adc::ACSR_ACIE);}
-            inline bool isEnabled(){return Regs::Adc::AnalogComparatorControlAndStatusReg.readBit(RegBits::Adc::ACSR_ACIE);}
-            void attach(Callback cbFunc){cbAcCallback = cbFunc; this->enable();}
-            void detach(){cbAcCallback = nullptr; this->disable();}
-            inline void handle(){if(cbAcCallback) cbAcCallback();}
-            void selectMode(AcInterruptMode ac_int_mode){
-                Regs::Adc::AnalogComparatorControlAndStatusReg.writeMasked(static_cast<uint8_t>(ac_int_mode), bitmask_acsr_int_mode_bits);
-            }
-        }static Interrupt;
+        static AcInterrupt Interrupt;
         static void setPositiveInputA0(AcA0Channel channel){
             static_cast<uint8_t>(channel)?
                 Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACBG):
@@ -75,21 +77,24 @@ namespace Peripherals{
             /* Enable analog comparator to use multiplexer of adc*/
             Regs::Adc::AdcControlAndStatusRegB.setBitmask(RegBits::Adc::ADCSRB_ACME);
             /* Select channel*/
-            Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(channel), bitmask_admux_channel_sel_bits);
+            Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(channel), ~bitmask_admux_channel_sel_bits);
         }
         static void disable(){
-            bool currentStatus = AnalogComp::Interrupt.isEnabled();
+            bool currentIntStatus = AnalogComp::Interrupt.isEnabled();
             AnalogComp::Interrupt.disable();
             Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACD);
-            if(currentStatus) AnalogComp::Interrupt.enable();
+            if(currentIntStatus) AnalogComp::Interrupt.enable();
         }
         static void enable(){
-            bool currentStatus = AnalogComp::Interrupt.isEnabled();
+            bool currentIntStatus = AnalogComp::Interrupt.isEnabled();
             AnalogComp::Interrupt.disable();
             Regs::Adc::AnalogComparatorControlAndStatusReg.clearBitmask(RegBits::Adc::ACSR_ACD);
-            if(currentStatus) AnalogComp::Interrupt.enable();
+            if(currentIntStatus) AnalogComp::Interrupt.enable();
         }
         static void disableDigitalInputBuffer(AcInput ac_input){
+            Regs::Adc::DigitalInputDisableReg1.setBitmask(static_cast<uint8_t>(ac_input));
+        }
+        static void enableDigitalInputBuffer(AcInput ac_input){
             Regs::Adc::DigitalInputDisableReg1.setBitmask(static_cast<uint8_t>(ac_input));
         }
         static bool readOutput(){

@@ -59,18 +59,18 @@ $(ELF): $(OBJS)
 # 5a. RAPORLAMA ve BİLGİ
 # ==========================================================
 size:
-	@echo "--- HAFIZA KULLANIMI ---"
-	@$(SIZE) --format-avr --mmcu=$(DEVICE) $(ELF)
+	@echo "---| HAFIZA KULLANIMI |---"
+	@$(SIZE) --format=gnu $(ELF)
 
 # ==========================================================
 # 5b. YÜKLEME VE TEMİZLİK
 # ==========================================================
 upload: all
-	@echo "--- YÜKLEME BAŞLATILIYOR ---"
+	@echo "---| YÜKLEME BAŞLATILIYOR |---"
 	$(AVRDUDE) $(AVRDUDE_FLAGS) -U flash:w:$(HEX):i
 
 clean:
-	@echo "--- TEMİZLENİYOR ---"
+	@echo "---| TEMİZLENİYOR |---"
 	rm -f $(OBJS) $(ELF) $(HEX)
 
 .PHONY: all clean upload

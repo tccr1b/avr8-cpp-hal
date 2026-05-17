@@ -123,69 +123,80 @@ namespace Timers{
         };
     private:
         using Callback = void(*)();                             //callback için fonksiyon tipi
-        inline static Callback overflowCallback      = nullptr; //cbOverflow
-        inline static Callback compareMatchACallback = nullptr; //cbCompareMatchA
-        inline static Callback compareMatchBCallback = nullptr; //cbCompareMatchB
+        inline static Callback cbOverflowCallback      = nullptr; //cbOverflow
+        inline static Callback cbCompareMatchACallback = nullptr; //cbCompareMatchA
+        inline static Callback cbCompareMatchBCallback = nullptr; //cbCompareMatchB
         inline static Clock currentClock;
         template<typename IOPin, uint8_t comBitPos, uint8_t focBitPos> struct OCPin{
-                inline void enable(){
-                    IOPin::setPinMode(HAL::PinMode::Output);
-                }
-                inline void setOutputMode(OutputMode out_mode){
+                inline void enable (){IOPin::setPinMode(PinMode::Output);}
+                inline void disable(){IOPin::setPinMode(PinMode::HighImpedance);}
+                OCPin& setOutputMode(OutputMode out_mode){
                     uint8_t mode = static_cast<uint8_t>(out_mode);
                     uint8_t mask = ~(0x03 << comBitPos);
                     mode <<= comBitPos;
                     mcu::Regs::Timers::Timer0::TimerCounterControlRegA.writeMasked(mode, mask);
+                    return *this;
                 }
                 inline void forceOutput(){/* NOT TESTED YET*/
                     if(Regs::Timers::Timer0::TimerCounterControlRegA.readBit(RegBits::Timers::Timer0::TCCR0A_WGM00)) return;
                     mcu::Regs::Timers::Timer0::TimerCounterControlRegB.setBitmask(1 << focBitPos);
                 }
             };
-    public:
-        static OCPin<Gpio::PinOC0A, BITPOS_COM0A, BITPOS_FOC0A> ChannelA;
-        static OCPin<Gpio::PinOC0B, BITPOS_COM0B, BITPOS_FOC0B> ChannelB;
-        struct{ //Interrupts
-            void enable(InterruptType intType){
+        struct Interrupt{
+        private:
+            inline static InterruptType current_int_type;
+        public:
+            void enable (InterruptType intType){
                 Regs::Timers::Timer0::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));
+                current_int_type = intType;
             }
             void disable(InterruptType intType){
                 Regs::Timers::Timer0::TimerInterruptMaskReg.clearBitmask(static_cast<uint8_t>(intType));
+                current_int_type = intType;
             }
-            void attach(InterruptType intType, Callback callbackFunc){
+            inline void disable(){this->disable(current_int_type);}
+            inline void enable (){this->enable (current_int_type);}
+            Interrupt&  attach (InterruptType intType, Callback callbackFunc){
                 switch (intType){
-                    case InterruptType::Overflow            :overflowCallback      = callbackFunc; break;
-                    case InterruptType::OutputCompareMatchA :compareMatchACallback = callbackFunc; break;
-                    case InterruptType::OutputCompareMatchB :compareMatchBCallback = callbackFunc; break;
+                    case InterruptType::Overflow            :cbOverflowCallback      = callbackFunc; break;
+                    case InterruptType::OutputCompareMatchA :cbCompareMatchACallback = callbackFunc; break;
+                    case InterruptType::OutputCompareMatchB :cbCompareMatchBCallback = callbackFunc; break;
                     case InterruptType::All:break;
                 }
-                this->enable(intType);
+//                this->enable(intType);
+                current_int_type = intType;
+                return *this;
             }
-            void detach(InterruptType intType){
+            Interrupt&  detach (InterruptType intType){
                 switch (intType){
-                    case InterruptType::Overflow            :overflowCallback     = nullptr; break;
-                    case InterruptType::OutputCompareMatchA :compareMatchACallback= nullptr; break;
-                    case InterruptType::OutputCompareMatchB :compareMatchBCallback= nullptr; break;
-                    case InterruptType::All                 :overflowCallback     = nullptr;
-                                                             compareMatchACallback= nullptr;
-                                                             compareMatchBCallback= nullptr; break;
+                    case InterruptType::Overflow            :cbOverflowCallback     = nullptr; break;
+                    case InterruptType::OutputCompareMatchA :cbCompareMatchACallback= nullptr; break;
+                    case InterruptType::OutputCompareMatchB :cbCompareMatchBCallback= nullptr; break;
+                    case InterruptType::All                 :cbOverflowCallback     = nullptr;
+                                                             cbCompareMatchACallback= nullptr;
+                                                             cbCompareMatchBCallback= nullptr; break;
                 }
-                this->disable(intType);
+                current_int_type = intType;
+                return *this;
             }
-            void handler(InterruptType intType){
+            inline void handle (InterruptType intType){
                 switch (intType){
-                    case InterruptType::Overflow           : if(overflowCallback)      overflowCallback()     ; break;
-                    case InterruptType::OutputCompareMatchA: if(compareMatchACallback) compareMatchACallback(); break;
-                    case InterruptType::OutputCompareMatchB: if(compareMatchBCallback) compareMatchBCallback(); break;
+                    case InterruptType::Overflow           : if(cbOverflowCallback)      cbOverflowCallback()     ; break;
+                    case InterruptType::OutputCompareMatchA: if(cbCompareMatchACallback) cbCompareMatchACallback(); break;
+                    case InterruptType::OutputCompareMatchB: if(cbCompareMatchBCallback) cbCompareMatchBCallback(); break;
                 }
             }
-        }static Interrupts;
+        };
+    public:
+        static OCPin<Gpio::PinOC0A, BITPOS_COM0A, BITPOS_FOC0A> ChannelA;
+        static OCPin<Gpio::PinOC0B, BITPOS_COM0B, BITPOS_FOC0B> ChannelB;
+        static Interrupt Interrupts;
         static void disable(){
-            setClock(Clock::Stopped);
+            setClockPrescaler(Clock::Stopped);
         }
         static void enable(){
             mcu::System::Power::activatePeripheral(Peripheral::Timer0);
-            if(currentClock != Clock::Stopped) setClock(currentClock);
+            if(currentClock != Clock::Stopped) setClockPrescaler(currentClock);
         }
         static void clearCounter(){
             mcu::Regs::Timers::Timer0::TimerCounterReg = 0x00;
@@ -200,7 +211,7 @@ namespace Timers{
             Regs::Timers::Timer0::TimerCounterControlRegB.writeMasked(static_cast<uint8_t>(timerMode), bitmask_tccrb_mode_bits);
 
         }
-        static void setClock(Clock tmrClock){
+        static void setClockPrescaler(Clock tmrClock){
             constexpr uint8_t bitmask_tccrb_cs_bits = ~(RegBits::Timers::Timer0::TCCR0B_CS00| 
                                                         RegBits::Timers::Timer0::TCCR0B_CS01| 
                                                         RegBits::Timers::Timer0::TCCR0B_CS02);
@@ -218,7 +229,7 @@ namespace Timers{
             Regs::Timers::Timer0::TimerCounterReg.setValue(0x00);
             Regs::Timers::GeneralTimerCounterControlReg.setBitmask(RegBits::Timers::Common::GTCCR_PSRSYNC);
         }
-        inline static void setCounterValue(uint8_t val){
+        inline static void setCounterValue (uint8_t val){
             mcu::Regs::Timers::Timer0::TimerCounterReg = val;
         }
         inline static void setCompareValueA(uint8_t topValue){
@@ -262,7 +273,7 @@ namespace Timers{
             /* Select operating mode*/
             setMode(tmrMode);
             /* Select prescaler or external/internal clock*/
-            setClock(tmrClock);
+            setClockPrescaler(tmrClock);
         }
         /* BASKA YERE ALINACAK*/
         static uint32_t setFrequency(uint32_t freq){
@@ -291,7 +302,7 @@ namespace Timers{
                 uint32_t ocrValue = cpuFrequency/(2*timerPrescalers[i]*freq);
                 if(ocrValue<=255){
                     setCompareValueA(static_cast<uint8_t>(ocrValue));
-                    setClock(static_cast<Clock>(timerPrescalers[i]));
+                    setClockPrescaler(static_cast<Clock>(timerPrescalers[i]));
                     return cpuFrequency/(2*timerPrescalers[i]*(ocrValue+1));
                 }
             }
@@ -373,16 +384,16 @@ namespace Timers{
         inline static Callback cbCompareMatchACallback = nullptr;
         inline static Callback cbCompareMatchBCallback = nullptr;
         inline static Callback cbInputCaptureCallback  = nullptr;
-        inline static Clock currentClock;
+        inline static Clock    currentClock;
         template<typename IOPin, uint8_t comBitPos, uint8_t focBitPos> struct OCPin{
-            inline void enable(){
-                IOPin::setPinMode(HAL::PinMode::Output);
-            }
-            inline void setOutputMode(OutputMode out_mode){
+            inline void enable (){IOPin::setPinMode(PinMode::Output);}
+            inline void disable(){IOPin::setPinMode(PinMode::HighImpedance);}
+            inline OCPin& setOutputMode(OutputMode out_mode){
                 uint8_t mode = static_cast<uint8_t>(out_mode);
                 uint8_t mask = ~(0x03 << comBitPos);
                 mode <<= comBitPos;
                 mcu::Regs::Timers::Timer1::TimerCounterControlRegA.writeMasked(mode, mask);
+                return *this;
             }
             inline void forceOutput(){/* NOT TESTED YET*/
                 if(Regs::Timers::Timer1::TimerCounterControlRegA.readBit(RegBits::Timers::Timer1::TCCR1A_WGM10)) return;
@@ -394,9 +405,9 @@ namespace Timers{
         static OCPin<Gpio::PinOC1A, BITPOS_COM1A, BITPOS_FOC1A> ChannelA;
         static OCPin<Gpio::PinOC1B, BITPOS_COM1B, BITPOS_FOC1B> ChannelB;
         struct{ //Interrupts
-            void enable(InterruptType intType){Regs::Timers::Timer1::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));}
+            void enable (InterruptType intType){Regs::Timers::Timer1::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));}
             void disable(InterruptType intType){Regs::Timers::Timer1::TimerInterruptMaskReg.clearBitmask(static_cast<uint8_t>(intType));}
-            void attach(InterruptType intType, Callback callbackFunc){
+            void attach (InterruptType intType, Callback callbackFunc){
                 if(InterruptType::All == intType) return;
                 switch (intType){
                     case InterruptType::Overflow            :cbOverflowCallback      = callbackFunc; break;
@@ -407,7 +418,7 @@ namespace Timers{
                 }
                 this->enable(intType);
             }
-            void detach(InterruptType intType){
+            void detach (InterruptType intType){
                 switch (intType){
                     case InterruptType::Overflow            :cbOverflowCallback      = nullptr; break;
                     case InterruptType::OutputCompareMatchA :cbCompareMatchACallback = nullptr; break;
@@ -419,7 +430,7 @@ namespace Timers{
                 }
                 this->disable(intType);
             }
-            void handler(InterruptType intType){
+            void handle (InterruptType intType){
                 switch (intType){
                     case InterruptType::Overflow           : if(cbOverflowCallback)      cbOverflowCallback()     ; break;
                     case InterruptType::OutputCompareMatchA: if(cbCompareMatchACallback) cbCompareMatchACallback(); break;
@@ -429,11 +440,11 @@ namespace Timers{
             }
         }static Interrupts;
         static void disable(){
-            setClock(Clock::Stopped);
+            setClockPrescaler(Clock::Stopped);
         }
         static void enable(){
             mcu::System::Power::activatePeripheral(Peripheral::Timer1);
-            if(currentClock != Clock::Stopped) setClock(currentClock);
+            if(currentClock != Clock::Stopped) setClockPrescaler(currentClock);
         }
         static void clearCounter(){
             {AtomicBlock ab;
@@ -468,7 +479,7 @@ namespace Timers{
                 Regs::Timers::Timer1::TimerCounterControlRegB.clearBitmask(RegBits::Timers::Timer1::TCCR1B_ICES1);
             }
         }
-        static void setClock(Clock clk){
+        static void setClockPrescaler(Clock clk){
             constexpr uint8_t bitmask_tccrb_clk_bits = ~(RegBits::Timers::Timer1::TCCR1B_CS10|
                                                          RegBits::Timers::Timer1::TCCR1B_CS11|
                                                          RegBits::Timers::Timer1::TCCR1B_CS12);
@@ -534,7 +545,7 @@ namespace Timers{
             }
             return counterVal;
         }
-        static Clock    getClock(){
+        static Clock    getClockPrescaler(){
             constexpr uint8_t bitmask_tccrb_clk_bits = (RegBits::Timers::Timer1::TCCR1B_CS10|
                                                         RegBits::Timers::Timer1::TCCR1B_CS11|
                                                         RegBits::Timers::Timer1::TCCR1B_CS12);
@@ -563,7 +574,7 @@ namespace Timers{
             setCounterValue(0x0000);
 
             setMode(tmrMode);
-            setClock(clk);
+            setClockPrescaler(clk);
         }
 
         static void pwmOut(uint32_t pwmFrequency, uint8_t pwmDutyCycle){}
@@ -631,21 +642,21 @@ f.Enable interrupts, if needed.
         inline static Callback cbOverflowCallback      = nullptr; //cbOverflow
         inline static Callback cbCompareMatchACallback = nullptr; //cbCompareMatchA
         inline static Callback cbCompareMatchBCallback = nullptr; //cbCompareMatchB
-        inline static Clock currentClock;
+        inline static Clock    currentClock;
         static ClockSource getClockSource(){
             constexpr static uint8_t bitmask_assr_clksrc_bits =(RegBits::Timers::Timer2::ASSR_EXCLK|
                                                                 RegBits::Timers::Timer2::ASSR_AS2);
             return static_cast<ClockSource>(Regs::Timers::Timer2::AsynchronousStatusReg & bitmask_assr_clksrc_bits);
         }
         template<typename IOPin, uint8_t comBitPos, uint8_t focBitPos> struct OCPin{
-                inline void enable(){
-                    IOPin::setPinMode(HAL::PinMode::Output);
-                }
-                inline void setOutputMode(OutputMode out_mode){
+                inline void enable (){IOPin::setPinMode(PinMode::Output);}
+                inline void disable(){IOPin::setPinMode(PinMode::HighImpedance);}
+                inline OCPin& setOutputMode(OutputMode out_mode){
                     uint8_t mode = static_cast<uint8_t>(out_mode);
                     uint8_t mask = ~(0x03 << comBitPos);
                     mode <<= comBitPos;
                     mcu::Regs::Timers::Timer2::TimerCounterControlRegA.writeMasked(mode, mask);
+                    return *this;
                 }
                 inline void forceOutput(){/* NOT TESTED YET*/
                     if(Regs::Timers::Timer2::TimerCounterControlRegA.readBit(RegBits::Timers::Timer2::TCCR2A_WGM20)) return;
@@ -656,13 +667,13 @@ f.Enable interrupts, if needed.
         static OCPin<Gpio::PinOC2A, BITPOS_COM0A, BITPOS_FOC0A> ChannelA;
         static OCPin<Gpio::PinOC2B, BITPOS_COM0B, BITPOS_FOC0B> ChannelB;
         struct{ //Interrupts
-            void enable(InterruptType intType){
+            void enable (InterruptType intType){
                 Regs::Timers::Timer2::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));
             }
             void disable(InterruptType intType){
                 Regs::Timers::Timer2::TimerInterruptMaskReg.clearBitmask(static_cast<uint8_t>(intType));
             }
-            void attach(InterruptType intType, Callback callbackFunc){
+            void attach (InterruptType intType, Callback callbackFunc){
                 if(intType == InterruptType::All) return;
                 switch (intType){
                     case InterruptType::Overflow            :cbOverflowCallback      = callbackFunc; break;
@@ -672,7 +683,7 @@ f.Enable interrupts, if needed.
                 }
                 this->enable(intType);
             }
-            void detach(InterruptType intType){
+            void detach (InterruptType intType){
                 switch (intType){
                     case InterruptType::Overflow            :cbOverflowCallback     = nullptr; break;
                     case InterruptType::OutputCompareMatchA :cbCompareMatchACallback= nullptr; break;
@@ -683,7 +694,7 @@ f.Enable interrupts, if needed.
                 }
                 this->disable(intType);
             }
-            void handler(InterruptType intType){
+            void handle (InterruptType intType){
                 switch (intType){
                     case InterruptType::Overflow           : if(cbOverflowCallback)      cbOverflowCallback()     ; break;
                     case InterruptType::OutputCompareMatchA: if(cbCompareMatchACallback) cbCompareMatchACallback(); break;
@@ -705,14 +716,14 @@ f.Enable interrupts, if needed.
             synch();
         }
         static void disable(){
-            setClock(Clock::Stopped);
+            setClockPrescaler(Clock::Stopped);
         }
         static void enable(){
             /* Logical Error !!!*/
             mcu::System::Power::activatePeripheral(Peripheral::Timer2);
-            if(currentClock != Clock::Stopped) setClock(currentClock);
+            if(currentClock != Clock::Stopped) setClockPrescaler(currentClock);
         }
-        static void setClock(Clock clk){
+        static void setClockPrescaler(Clock clk){
             constexpr uint8_t bitmask_tccrb_clk_bits = ~(RegBits::Timers::Timer2::TCCR2B_CS22|
                                                          RegBits::Timers::Timer2::TCCR2B_CS21|
                                                          RegBits::Timers::Timer2::TCCR2B_CS20);
@@ -802,7 +813,7 @@ f.Enable interrupts, if needed.
             /* Set clock source*/
             selectClockSource(clkSource);
             /* Set clock prescaler*/
-            setClock(clk);
+            setClockPrescaler(clk);
         }
     };
 
@@ -811,27 +822,27 @@ f.Enable interrupts, if needed.
 
 
 /* Timer0 Overflow Interrupt*/
-ISR(TIMER0_OVF_vect){mcu::Timers::Timer0::Interrupts.handler(mcu::Timers::Timer0::InterruptType::Overflow);}
+ISR(TIMER0_OVF_vect){mcu::Timers::Timer0::Interrupts.handle(mcu::Timers::Timer0::InterruptType::Overflow);}
 /* Output compare match A interrupt*/
-ISR(TIMER0_COMPA_vect){mcu::Timers::Timer0::Interrupts.handler(mcu::Timers::Timer0::InterruptType::OutputCompareMatchA);}
+ISR(TIMER0_COMPA_vect){mcu::Timers::Timer0::Interrupts.handle(mcu::Timers::Timer0::InterruptType::OutputCompareMatchA);}
 /* Output compare match B interrupt*/
-ISR(TIMER0_COMPB_vect){mcu::Timers::Timer0::Interrupts.handler(mcu::Timers::Timer0::InterruptType::OutputCompareMatchB);}
+ISR(TIMER0_COMPB_vect){mcu::Timers::Timer0::Interrupts.handle(mcu::Timers::Timer0::InterruptType::OutputCompareMatchB);}
 
 /* Timer1 overflow interrupt*/
-ISR(TIMER1_OVF_vect){mcu::Timers::Timer1::Interrupts.handler(mcu::Timers::Timer1::InterruptType::Overflow);}
+ISR(TIMER1_OVF_vect){mcu::Timers::Timer1::Interrupts.handle(mcu::Timers::Timer1::InterruptType::Overflow);}
 /* Timer1 output compare match A interrupt*/
-ISR(TIMER1_COMPA_vect){mcu::Timers::Timer1::Interrupts.handler(mcu::Timers::Timer1::InterruptType::OutputCompareMatchA);}
+ISR(TIMER1_COMPA_vect){mcu::Timers::Timer1::Interrupts.handle(mcu::Timers::Timer1::InterruptType::OutputCompareMatchA);}
 /* Timer1 output compare match B interrupt*/
-ISR(TIMER1_COMPB_vect){mcu::Timers::Timer1::Interrupts.handler(mcu::Timers::Timer1::InterruptType::OutputCompareMatchB);}
+ISR(TIMER1_COMPB_vect){mcu::Timers::Timer1::Interrupts.handle(mcu::Timers::Timer1::InterruptType::OutputCompareMatchB);}
 /* Timer1 capture event interrupt*/
-ISR(TIMER1_CAPT_vect){mcu::Timers::Timer1::Interrupts.handler(mcu::Timers::Timer1::InterruptType::InputCapture);}
+ISR(TIMER1_CAPT_vect){mcu::Timers::Timer1::Interrupts.handle(mcu::Timers::Timer1::InterruptType::InputCapture);}
 
 /* Timer2 Overflow Interrupt*/
-ISR(TIMER2_OVF_vect){mcu::Timers::Timer2::Interrupts.handler(mcu::Timers::Timer2::InterruptType::Overflow);}
+ISR(TIMER2_OVF_vect){mcu::Timers::Timer2::Interrupts.handle(mcu::Timers::Timer2::InterruptType::Overflow);}
 /* Timer2 Output Compare Match A Interrupt*/
-ISR(TIMER2_COMPA_vect){mcu::Timers::Timer2::Interrupts.handler(mcu::Timers::Timer2::InterruptType::OutputCompareMatchA);}
+ISR(TIMER2_COMPA_vect){mcu::Timers::Timer2::Interrupts.handle(mcu::Timers::Timer2::InterruptType::OutputCompareMatchA);}
 /* Timer2 Output Compare Match B Interrupt*/
-ISR(TIMER2_COMPB_vect){mcu::Timers::Timer2::Interrupts.handler(mcu::Timers::Timer2::InterruptType::OutputCompareMatchB);}
+ISR(TIMER2_COMPB_vect){mcu::Timers::Timer2::Interrupts.handle(mcu::Timers::Timer2::InterruptType::OutputCompareMatchB);}
 
 #endif //TIMERS_HPP
 
@@ -850,7 +861,7 @@ void foog(){
              T2::ClockSource::ExternalClock);
     T2::Interrupts.attach(T2::InterruptType::Overflow, count);
     T2::selectClockSource(T2::ClockSource::SystemClock);
-    mcu::Gpio::PinTOSC2::setPinMode(HAL::PinMode::Output);
+    mcu::Gpio::PinTOSC2::setPinMode(PinMode::Output);
     mcu::Gpio::PinTOSC2::setHigh();
     
 }
