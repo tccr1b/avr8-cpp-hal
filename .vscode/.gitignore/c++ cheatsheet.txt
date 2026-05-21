@@ -1,0 +1,68 @@
+__attribute__((always_inline))
+    En sade tabiriyle derleyiciye verilen "Sana fikrini sormuyorum, bu fonksiyonu kesinlikle inline yapacaksın!" emridir. 
+Standart C++'taki inline anahtar kelimesi aslında derleyici için sadece bir tavsiyedir (hint). Derleyici, kodun 
+boyutuna, optimizasyon seviyesine (-O1, -O2, -Os) veya fonksiyonun karmaşıklığına bakarak sizin inline yazdığınız 
+bir fonksiyonu normal bir fonksiyon çağrısına (call/ret) dönüştürebilir.
+    Özellikle gömülü sistemlerde (AVR gibi) veya kritik donanım sürücülerinde (HAL), bir GPIO pinini terslemek 
+gibi 1-2 cycle sürecek bir işlem için derleyicinin inisiyatif kullanıp maliyetli bir fonksiyon çağrısı oluşturmasını 
+istemeyiz. GNU Derleyici Koleksiyonu'na (GCC) özgü olan __attribute__((always_inline)) uzantısı, derleyicinin kendi 
+optimizasyon kurallarını ezip geçmesini sağlar ve kodu doğrudan çağrıldığı yere kopyalar.Gömülü sistem programlamada
+(özellikle AVR-GCC veya Clang kullanırken) çok işine yarayacak buna benzer diğer güçlü "nitelikler" (attributes) 
+şunlardır:
+
+Fonksiyon Optimizasyonu ve Çağrı Kontrolü
+__attribute__((noinline))
+    always_inline'ın tam zıttıdır. Derleyiciye "Bu fonksiyonu asla kodun içine gömme, her zaman gerçek bir atlama 
+(CALL) yap" der.
+    Ne zaman kullanılır? Eğer bir fonksiyon (örneğin bir hata yakalama veya delay fonksiyonu) çok büyükse ve 
+kodun 50 farklı yerinden çağrılıyorsa, inline olması Flash belleği (ROM) saniyeler içinde tüketir. -O3 
+optimizasyonunda derleyici her şeyi inline yapmaya çalışabilir; bunu durdurmak ve bellek tasarrufu yapmak için 
+kullanılır.
+
+__attribute__((flatten))
+    Bir fonksiyona eklendiğinde, o fonksiyonun kendi içinden çağırdığı diğer tüm fonksiyonları o anki kapsama inline 
+olarak gömmeye çalışır.
+    Ne zaman kullanılır? Kritik bir ISR veya hesaplama bloğunun içindeki tüm hiyerarşiyi tek bir düz (flat) makine 
+koduna indirgeyerek çağrı maliyetlerini sıfırlamak istediğinde.
+
+Kesmeler (Interrupts) ve Düşük Seviye Kontrol
+__attribute__((naked))
+    Derleyiciye "Bu fonksiyonun giriş (prologue) ve çıkış (epilogue) kodlarını (PUSH/POP işlemleri) üretme" der.
+Ne zaman kullanılır? Bir önceki mesajda konuştuğumuz register'ların yığına atılma maliyetini hatırlıyor musun? 
+Eğer saf Assembly ile kendi ISR'ni veya bir RTOS görev değiştiricisini (Context Switcher) yazıyorsan, derleyicinin 
+araya girip register bozmasını engellemek için naked kullanırsın. Dönüşü (RET veya RETI) senin Assembly ile manuel 
+yazman gerekir.
+
+        C++ kodu:
+        void myCustomISR() __attribute__((naked));
+        void myCustomISR() {
+            __asm__ volatile("sbi 0x05, 5 \n\t"); // Sadece pini set et
+            __asm__ volatile("reti \n\t");        // Çıkışı manuel yap
+        }
+
+__attribute__((used))
+    Derleyiciye "Kodun içinde bu fonksiyonu veya değişkeni çağıran hiçbir yer göremesen bile onu silme" der.
+Ne zaman kullanılır? Derleyiciler kullanılmayan kodu atmada (Dead Code Elimination) çok agresiftir. Bir donanım 
+kesme vektörü sadece donanım tarafından çağrıldığı için derleyici onu "kullanılmıyor" sanıp silebilir. Bunu 
+engellemek için kullanılır (AVR'nin ISR() makrosunun içinde otomatik olarak bulunur).
+
+Linker (Bağlayıcı) ve Mimari Kontrolleri
+__attribute__((weak))
+    "Zayıf" tanım anlamına gelir. Derleyiciye "Bu fonksiyonun varsayılan bir gövdesi var, ama kullanıcı kendi 
+projesinde aynı isimde bir fonksiyon yazarsa benimkini ez (override) ve hata verme" der.
+Ne zaman kullanılır? HAL kütüphanelerinde harikadır. Kütüphanene boş bir 
+    void SPI_TransferComplete() __attribute__((weak)); 
+eklersin. Kullanıcı kendi ana kodunda bu fonksiyonu tanımlamazsa kod çökmez, boş fonksiyon çalışır. Tanımlarsa, 
+derleyici kütüphanedekini çöpe atıp kullanıcınınkini bağlar. "Multiple definition" hatasını önler. 
+(Arduino'daki serialEvent() veya setup() mantığı arka planda weak attribute kullanır).
+
+__attribute__((section(".name")))
+    Derlenmiş kodun veya değişkenin belleğin hangi bölümüne (RAM, Flash, EEPROM vb.) yerleştirileceğini seçmeni 
+sağlar.
+Ne zaman kullanılır? AVR mimarisi Harvard mimarisidir (RAM ve Flash ayrıdır). Büyük bir sabit diziyi (örneğin font 
+veya lookup table) RAM'i şişirmemesi için doğrudan Flash'a (PROGMEM) kaydetmek istediğinde arka planda bu attribute 
+çalışır. Veya kendi yazdığın bir Bootloader'ı Flash'ın spesifik bir adresine yerleştirmek için kullanılır.
+
+        C++
+        // Değişkeni RAM yerine Flash belleğin .progmem bölümüne koy
+        const uint16_t sine_table[] __attribute__((section(".progmem"))) = { /* ... */ };

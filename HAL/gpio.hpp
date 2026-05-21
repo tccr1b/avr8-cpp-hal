@@ -3,9 +3,11 @@
 
 #define __AVR_ATmega328P__
 
-#include "registers.hpp"
 #include <assert.h>
+
+#include "registers.hpp"
 #include "utils.hpp" // custom std namespace: cstd
+#include "macros.hpp"
 
 using namespace mcu;
 
@@ -36,6 +38,7 @@ namespace HAL{  /* Template GpioPort & GpioPin*/
             switch (pin_mode){
             case PinMode::Input:
                 /* Switching between Input with Pull-Up to Output Low (InputWithPullUp => Hi-Z => OutputLow)*/
+                __asm__ __volatile__("nop");
                 gpioPORT::PortReg().clearBitmask(pinPosBitmask);
                 gpioPORT::DataDirectionReg().clearBitmask(pinPosBitmask);
                 break;
@@ -86,11 +89,10 @@ namespace HAL{  /* Template GpioPort & GpioPin*/
         static uint8_t  getDataDirRegAddr(){return gpioPORT::DataDirectionReg();}
         static uint8_t  getInputRegAddr()  {return gpioPORT::InputReg();}
 
-        static inline void setHigh()    {gpioPORT::PortReg().setBitmask(pinPosBitmask);}
-        static inline void setLow()     {gpioPORT::PortReg().clearBitmask(pinPosBitmask);}
-//        static inline void toggle()     {gpioPORT::PortReg().toggleBitmask(pinPosBitmask);}
-        static inline void toggle()    {gpioPORT::InputReg().setValue(pinPosBitmask);}
-        static inline bool readPin()    {__asm__("nop"); return gpioPORT::InputReg().readBit(pinPosBitmask);}
+        [[gnu::always_inline]] static inline void setHigh(){gpioPORT::PortReg().setBitmask(pinPosBitmask);}
+        [[gnu::always_inline]] static inline void setLow (){gpioPORT::PortReg().clearBitmask(pinPosBitmask);}
+        [[gnu::always_inline]] static inline void toggle (){gpioPORT::InputReg().setValue(pinPosBitmask);}
+        [[gnu::always_inline]] static inline bool readPin(){return gpioPORT::InputReg().readBit(pinPosBitmask);}
 };
 
     template<typename gpioPORT, uint8_t combinedMask>
@@ -206,7 +208,7 @@ using PinPD7    = HAL::GpioPin<GpioPortD, RegBits::Gpio::PortD::PD_7>;
 using PinAIN0   = PinPD6; using PinAIN1   = PinPD7; using PinINT0   = PinPD2;
 using PinINT1   = PinPD3; using PinOC0A   = PinPD6; using PinOC0B   = PinPD5;
 using PinOC2B   = PinPD3; using PinRXD    = PinPD0; using PinT0     = PinPD4;
-using PinT1     = PinPD5; using PinTXD    = PinPD0; using PinXCK    = PinPD4;
+using PinT1     = PinPD5; using PinTXD    = PinPD1; using PinXCK    = PinPD4;
 
 } // namespace Gpio
 } // namespace mcu

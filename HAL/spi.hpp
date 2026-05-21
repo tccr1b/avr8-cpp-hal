@@ -86,14 +86,15 @@ private:
     inline static bool isBusy(){
         return !Regs::Spi::SpiStatusReg.readBit(RegBits::Spi::SPSR_SPIF);
     }
-public:
-    struct{ //SPI Interrupt
+    struct SpiInterrupt{
         void enable() {Regs::Spi::SpiControlReg.setBitmask(RegBits::Spi::SPCR_SPIE);}
         void disable(){Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_SPIE);}
-        void attach(Callback cbFunc){cbTransferCompletedCallback = cbFunc; this->enable();}
-        void detach() {cbTransferCompletedCallback = nullptr; this->disable();}
+        SpiInterrupt& attach(Callback cbFunc){cbTransferCompletedCallback = cbFunc; return *this;}
+        SpiInterrupt& detach() {cbTransferCompletedCallback = nullptr; return *this;}
         void handle() {if(cbTransferCompletedCallback) cbTransferCompletedCallback();}
-    }static TransferCompletedInterrupt;
+    };
+public:
+    static SpiInterrupt TransferCompletedInterrupt;
     inline static bool isEnabled(){
         return Regs::Spi::SpiControlReg.readBit(RegBits::Spi::SPCR_SPE) && 
                !Regs::Core::PowerReductionReg.readBit(RegBits::Core::PRR_PRSPI);

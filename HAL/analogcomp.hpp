@@ -27,30 +27,25 @@ enum class AcA0Channel    :uint8_t{
 enum class AcInterruptMode:uint8_t{
     InterruptOnOutputToggle      = 0x00,
     InterruptOnFallingOutputEdge = RegBits::Adc::ACSR_ACIS1,
-    InterruptOnRisingOutputEdge  = RegBits::Adc::ACSR_ACIS0 | RegBits::Adc::ACSR_ACIS0,
+    InterruptOnRisingOutputEdge  = RegBits::Adc::ACSR_ACIS1 | RegBits::Adc::ACSR_ACIS0,
 };
 enum class AcInput        :uint8_t{
     Ain0 = RegBits::Ac::DIDR1_AIN0D,
     Ain1 = RegBits::Ac::DIDR1_AIN1D,
 };
 
-
 namespace mcu{
 namespace Peripherals{
     class AnalogComp{
     private:
-        constexpr static uint8_t bitmask_admux_channel_sel_bits = (RegBits::Adc::ADMUX_MUX0|
-                                                                   RegBits::Adc::ADMUX_MUX1|
-                                                                   RegBits::Adc::ADMUX_MUX2|
-                                                                   RegBits::Adc::ADMUX_MUX3);
+        constexpr static uint8_t bitmask_admux_channel_sel_bits = (RegBits::Adc::ADMUX_MUX0|RegBits::Adc::ADMUX_MUX1|
+                                                                   RegBits::Adc::ADMUX_MUX2|RegBits::Adc::ADMUX_MUX3);
 
-        constexpr static uint8_t bitmask_acsr_int_mode_bits     = (RegBits::Adc::ACSR_ACIS0|
-                                                                   RegBits::Adc::ACSR_ACIS1);
+        constexpr static uint8_t bitmask_acsr_int_mode_bits     = (RegBits::Adc::ACSR_ACIS0|RegBits::Adc::ACSR_ACIS1);
         using Callback = void(*)(void);
         inline static Callback cbAcCallback = nullptr;
-//        inline static bool currentIntStatus;
         struct AcInterrupt{
-            void enable() {Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACIE);}
+            void enable (){Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACIE);}
             void disable(){Regs::Adc::AnalogComparatorControlAndStatusReg.clearBitmask(RegBits::Adc::ACSR_ACIE);}
             inline bool  isEnabled(){return Regs::Adc::AnalogComparatorControlAndStatusReg.readBit(RegBits::Adc::ACSR_ACIE);}
             AcInterrupt& attach(Callback cbFunc){cbAcCallback = cbFunc; return *this;}
@@ -95,10 +90,18 @@ namespace Peripherals{
             Regs::Adc::DigitalInputDisableReg1.setBitmask(static_cast<uint8_t>(ac_input));
         }
         static void enableDigitalInputBuffer(AcInput ac_input){
-            Regs::Adc::DigitalInputDisableReg1.setBitmask(static_cast<uint8_t>(ac_input));
+            Regs::Adc::DigitalInputDisableReg1.clearBitmask(static_cast<uint8_t>(ac_input));
         }
         static bool readOutput(){
             return Regs::Adc::AnalogComparatorControlAndStatusReg.readBit(RegBits::Adc::ACSR_ACO);
+        }
+/* On the Analog Comparator output (ACO), and this change confirms to the setting of the edge 
+detector, a capture will be triggered*/
+        static void enableInputCapture(){
+            Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACIC);
+        }
+        static void disableInputCapture(){
+            Regs::Adc::AnalogComparatorControlAndStatusReg.clearBitmask(RegBits::Adc::ACSR_ACIC);
         }
     };
 

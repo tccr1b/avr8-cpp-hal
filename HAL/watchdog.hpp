@@ -2,8 +2,9 @@
 #ifndef WATCHDOG_TIMER_HPP
 #define WATCHDOG_TIMER_HPP
 
-#include "registers.hpp"
 #include <avr/interrupt.h>
+#include "registers.hpp"
+#include "macros.hpp"
 
 enum class WatchdogTimeout : uint8_t{
     _16ms  = 0x00,                       //0b1101 1000 WDP = ..0. .000
@@ -41,8 +42,8 @@ namespace System{
             inline static WatchdogMode wdMode = WatchdogMode::SystemReset;
         public:
             struct{
-                void attach(Callback cb){cbInterruptCallback = cb;}
-                void detach(){cbInterruptCallback = nullptr;}
+                void attach(Callback cb) {cbInterruptCallback = cb;}
+                void detach() {cbInterruptCallback = nullptr;}
                 void handle(){if(cbInterruptCallback) cbInterruptCallback();}
             }static Interrupt;
             static void setTimeOut(WatchdogTimeout wdtTimeout){
@@ -126,7 +127,7 @@ namespace System{
                 /* Restore Status Register*/
                 Regs::Core::StatusReg.setValue(oldSREG);
             }
-            static inline void reset(){__asm__ __volatile__ ("wdr");}
+            [[gnu::always_inline]] static inline void reset(){__asm__ __volatile__("wdr");}
             static bool isActive(){return mcu::Regs::Core::WatchdogTimerControlReg.readBit(mcu::RegBits::Core::WDTCSR_WDE);}
     };
 } //namespace System

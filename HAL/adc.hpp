@@ -2,6 +2,7 @@
 #define ADC_HPP
 
 #define __AVR_ATmega328P__
+#include "macros.hpp"
 #include "registers.hpp"
 #include "sysctrl.hpp"
 #include "HAL/utils/atomicblock.hpp"
@@ -75,18 +76,18 @@ namespace mcu{
 namespace Peripherals{
     class Adc{
     private:
-        const static uint8_t bitmask_acsra_prescaler_bits   = (RegBits::Adc::ADCSRA_ADPS0| 
-                                                               RegBits::Adc::ADCSRA_ADPS1| 
-                                                               RegBits::Adc::ADCSRA_ADPS2);
-        const static uint8_t bitmask_acsrb_trigger_sel_bits = (RegBits::Adc::ADCSRB_ADTS0|
-                                                               RegBits::Adc::ADCSRB_ADTS1|
-                                                               RegBits::Adc::ADCSRB_ADTS2);
-        const static uint8_t bitmask_admux_ref_sel_bits     = (RegBits::Adc::ADMUX_REFS0|
-                                                               RegBits::Adc::ADMUX_REFS1);
-        const static uint8_t bitmask_admux_channel_sel_bits = (RegBits::Adc::ADMUX_MUX0|
-                                                               RegBits::Adc::ADMUX_MUX1|
-                                                               RegBits::Adc::ADMUX_MUX2|
-                                                               RegBits::Adc::ADMUX_MUX3);
+        constexpr static uint8_t bitmask_acsra_prescaler_bits   = (RegBits::Adc::ADCSRA_ADPS0| 
+                                                                   RegBits::Adc::ADCSRA_ADPS1| 
+                                                                   RegBits::Adc::ADCSRA_ADPS2);
+        constexpr static uint8_t bitmask_acsrb_trigger_sel_bits = (RegBits::Adc::ADCSRB_ADTS0|
+                                                                   RegBits::Adc::ADCSRB_ADTS1|
+                                                                   RegBits::Adc::ADCSRB_ADTS2);
+        constexpr static uint8_t bitmask_admux_ref_sel_bits     = (RegBits::Adc::ADMUX_REFS0|
+                                                                   RegBits::Adc::ADMUX_REFS1);
+        constexpr static uint8_t bitmask_admux_channel_sel_bits = (RegBits::Adc::ADMUX_MUX0|
+                                                                   RegBits::Adc::ADMUX_MUX1|
+                                                                   RegBits::Adc::ADMUX_MUX2|
+                                                                   RegBits::Adc::ADMUX_MUX3);
         using Callback = void(*)();
         inline static Callback cbAdcConversionCompletedCallback = nullptr;
         struct AutoTrig{
@@ -102,12 +103,18 @@ namespace Peripherals{
             [[nodiscard]] bool isEnabled(){return mcu::Regs::Adc::AdcControlAndStatusRegA.readBit(mcu::RegBits::Adc::ADCSRA_ADATE);}
         };
     public:
+        struct AdcConfig{
+            AdcReference adc_ref;
+            AdcChannel adc_ch;
+            AdcClock adc_clk;
+            AdcAutoTriggerSource adc_ats;
+        };
         struct{ //Interrupt
             void enable(){mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
             void disable(){mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
             void attach(Callback callbackFunc){cbAdcConversionCompletedCallback = callbackFunc; this->enable();}
             void detach(){cbAdcConversionCompletedCallback = nullptr; this->disable();}
-            inline void handler(){if(cbAdcConversionCompletedCallback) cbAdcConversionCompletedCallback();}
+            [[gnu::always_inline]] inline void handler(){if(cbAdcConversionCompletedCallback) cbAdcConversionCompletedCallback();}
         }static ConversionCompletedInterrupt;
         static AutoTrig AutoTriggering;
         static void selectChannel(AdcChannel ch){
@@ -178,6 +185,12 @@ namespace Peripherals{
             selectChannel(chan);
             enableAdc();
         }
+        static void init(AdcConfig* conf){
+            AutoTriggering.selectSource(conf->adc_ats).enable();
+            selectChannel(conf->adc_ch);
+            selectReference(conf->adc_ref);
+            setAdcClockPrescaler(conf->adc_clk);
+        }
     };
 } // namespace Peripherals
 } // namespace mcu
@@ -189,10 +202,6 @@ void foof(){
     mcu::Peripherals::Adc::disableDigitalInputBuffer(AdcChannel::No0);
     mcu::Peripherals::Adc::getActiveChannel();
     mcu::Peripherals::Adc::selectChannel(AdcChannel::No7);
-    mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::FreeRunning);
-    mcu::Peripherals::Adc::AutoTriggering.enable();
-    mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::ExternalIRQ0).enable();
-    mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::Timer0_Overflow).enable();
     mcu::Peripherals::Adc::enableAdc();
     mcu::Peripherals::Adc::read();
 }

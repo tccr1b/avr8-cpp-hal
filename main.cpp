@@ -19,6 +19,9 @@ using namespace mcu;
 using namespace HAL;
 
 
+const char myStr[] __attrib_section_progmem__ ={"asd"};
+const char myEepromStr[] __attrib_section_eeprom__ ={"ThisIsEepromData"};
+
 void sysReset(){
     static uint8_t resetCount = 0;
     builtinLed::toggle();
@@ -138,6 +141,21 @@ int main (){
     mcu::Peripherals::Adc::ConversionCompletedInterrupt.attach(timerCallback);
     mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::ExternalIRQ0).enable();
     
+    using adc = mcu::Peripherals::Adc;
+    adc::init(AdcChannel::InternalTempSensor);
+    adc::setAdcClockPrescaler(AdcClock::DividedBy128);
+    adc::selectReference(AdcReference::Internal_1v1);
+    adc::setResultAdjust(AdcResultAdjust::Right);
+    adc::ConversionCompletedInterrupt.attach(timerCallback);
+    adc::AutoTriggering.selectSource(AdcAutoTriggerSource::FreeRunning).enable();
+
+    adc::AdcConfig myAdcConf;
+        myAdcConf.adc_ats = AdcAutoTriggerSource::FreeRunning;
+        myAdcConf.adc_ch  = AdcChannel::InternalTempSensor;
+        myAdcConf.adc_clk = AdcClock::DividedBy128;
+        myAdcConf.adc_ref = AdcReference::Internal_1v1;
+    adc::init(&myAdcConf);
+    
     mcu::Peripherals::AnalogComp::Interrupt.selectMode(AcInterruptMode::InterruptOnRisingOutputEdge);
     mcu::Peripherals::AnalogComp::Interrupt.attach(sysReset).enable();
 
@@ -147,7 +165,6 @@ int main (){
     Comparator::setNegativeInputA1(AcA1Channel::AdcChNo0);
     Comparator::setPositiveInputA0(AcA0Channel::Ain0Pin);
     Comparator::enable();
-
     while(1){
 //        mcu::System::WatchdogTimer::reset();
         /* ArduinoUnoR3Pin:9 (PB1)*/
