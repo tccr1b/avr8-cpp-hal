@@ -90,6 +90,11 @@ namespace Peripherals{
                                                                    RegBits::Adc::ADMUX_MUX3);
         using Callback = void(*)();
         inline static Callback cbAdcConversionCompletedCallback = nullptr;
+        template<typename regAddr, uint8_t bitPosBitmask> struct Feature{
+            void enable()   {regAddr().setBitmask(bitPosBitmask);}
+            void disable()  {regAddr().clearBitmask(bitPosBitmask);}
+            [[nodiscard]] bool isEnabled(){return regAddr().readBit(bitPosBitmask);}
+        };
         struct AutoTrig{
             AutoTrig& selectSource(AdcAutoTriggerSource trigSrc){
                 mcu::Regs::Adc::AdcControlAndStatusRegB.writeMasked(static_cast<uint8_t>(trigSrc), ~bitmask_acsrb_trigger_sel_bits);
@@ -117,6 +122,7 @@ namespace Peripherals{
             [[gnu::always_inline]] inline void handler(){if(cbAdcConversionCompletedCallback) cbAdcConversionCompletedCallback();}
         }static ConversionCompletedInterrupt;
         static AutoTrig AutoTriggering;
+
         static void selectChannel(AdcChannel ch){
             bool auto_trg_flag = false;
             if(AutoTriggering.isEnabled()){AutoTriggering.disable(); auto_trg_flag = true;}

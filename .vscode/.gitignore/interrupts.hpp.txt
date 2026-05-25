@@ -1,0 +1,19 @@
+
+#include <inttypes.h>
+
+volatile uint32_t intFlags = 0x00000000;
+
+constexpr uint8_t spi_int_flag      = 0;
+constexpr uint8_t ac_int_flag       = 1;
+constexpr uint8_t adc_int_flag      = 2;
+constexpr uint8_t ee_rdy_int_flag   = 3;
+constexpr uint8_t tmr0_ovf_int_flag = 4;
+constexpr uint8_t tmr0_cmpA_int_flag= 5;
+constexpr uint8_t tmr0_cmpB_int_flag= 6;
+constexpr uint8_t tmr1_ovf_int_flag = 4;
+constexpr uint8_t tmr1_cmpA_int_flag= 5;
+constexpr uint8_t tmr1_cmpB_int_flag= 6;
+constexpr uint8_t tmr1_capt_int_flag= 7;
+constexpr uint8_t tmr2_ovf_int_flag = 8;
+constexpr uint8_t tmr2_cmpA_int_flag= 9;
+constexpr uint8_t tmr2_cmpB_int_flag= 10;

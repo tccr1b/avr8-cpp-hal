@@ -14,11 +14,14 @@ MyProject/
 #define SPI_HPP
 
 #define __AVR_ATmega328P__ // İş bitince bunu sil
+
+#include <avr/interrupt.h>
 #include <inttypes.h>
+
 #include "registers.hpp"
 #include "gpio.hpp"
 #include "utils/ring_buffer.hpp"
-#include <avr/interrupt.h>
+//#include "interrupts.hpp"
 
 #define TX_BUFFER_SIZE 32
 #define RX_BUFFER_SIZE 32

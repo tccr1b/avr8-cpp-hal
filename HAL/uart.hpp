@@ -92,8 +92,11 @@ private:
     inline static Callback cbDataRegisterEmptyCallback  = nullptr;
     static inline HAL::RingBuffer<uint8_t, TX_BUFFER_SIZE> txBuffer;
     static inline HAL::RingBuffer<uint8_t, RX_BUFFER_SIZE> rxBuffer;
-
-
+    template<typename regAddr, uint8_t bitPosBitmask> struct Feature{
+        void enable()   {regAddr().setBitmask(bitPosBitmask);}
+        void disable()  {regAddr().clearBitmask(bitPosBitmask);}
+        [[nodiscard]] bool isEnabled(){return regAddr().readBit(bitPosBitmask);}
+    };
     static bool transmissionsCompleted(){
         return (!Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_RXC0) && 
                 Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_TXC0));
@@ -254,7 +257,10 @@ private:
             (void)dummy;
         }
     }
-    
+    static Usart::Feature<decltype(Regs::Uart::UartControlAndStatusRegA), RegBits::Uart::UCSR0A_MPCM0> MultiprocessorMode;
+    static Usart::Feature<decltype(Regs::Uart::UartControlAndStatusRegB), RegBits::Uart::UCSR0B_RXEN0> Receiver;
+    static Usart::Feature<decltype(Regs::Uart::UartControlAndStatusRegB), RegBits::Uart::UCSR0B_TXEN0> Transmitter;
+
     /* Checking*/
     [[nodiscard]] static bool isAvailable(){ return !rxBuffer.isEmpty();}
     [[nodiscard]] static bool isReceivingCompleted(){
@@ -262,12 +268,6 @@ private:
     }
     [[nodiscard]] static bool isTransmittingCompleted(){
         return Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_TXC0);
-    }
-    [[nodiscard]] static bool isReceiverEnabled(){
-        return Regs::Uart::UartControlAndStatusRegB.readBit(RegBits::Uart::UCSR0B_RXEN0);
-    }
-    [[nodiscard]] static bool isTransmitterEnabled(){
-        return Regs::Uart::UartControlAndStatusRegB.readBit(RegBits::Uart::UCSR0B_TXEN0);
     }
     [[nodiscard]] static bool isDataRegisterEmpty(){
         return Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_UDRE0);
@@ -322,32 +322,6 @@ private:
             }
         }
     }static Interrupts;
-    static void enableMultiprocessorMode(){
-        Regs::Uart::UartControlAndStatusRegA.setBitmask(RegBits::Uart::UCSR0A_MPCM0);
-    }
-    static void disableMultiprocessorMode(){
-        Regs::Uart::UartControlAndStatusRegA.clearBitmask(RegBits::Uart::UCSR0A_MPCM0);
-    }
-    static void enableReceiver(){
-        /* Enable usart receiver
-        The receiver will override normal port operation for the RxDn pin when enabled*/
-        Regs::Uart::UartControlAndStatusRegB.setBitmask(RegBits::Uart::UCSR0B_RXEN0);
-    }
-    static void disableReceiver(){
-        mcu::Regs::Uart::UartControlAndStatusRegB.clearBitmask(RegBits::Uart::UCSR0B_RXEN0);
-        /* Config. rx pin Hi-Z. (not necessary)*/
-        mcu::Gpio::PinRXD::setPinMode(PinMode::HighImpedance);
-    }
-    static void enableTransmitter(){
-        /* Enable usart transmitter
-        The transmitter will override normal port operation for the TxDn pin when enabled*/
-        Regs::Uart::UartControlAndStatusRegB.setBitmask(RegBits::Uart::UCSR0B_TXEN0);
-    }
-    static void disableTransmitter(){
-        /* When disabled, the transmitter will no longer override the TxDn port*/
-        Regs::Uart::UartControlAndStatusRegB.clearBitmask(RegBits::Uart::UCSR0B_TXEN0);
-    }
-
     static void init(UsartMode       usartMode   = UsartMode::Asynchronous, 
                      UsartBaudrate   baud        = UsartBaudrate::_9600bps, 
                      UsartDataSize   dataSize    = UsartDataSize::_8bit, 
@@ -376,13 +350,13 @@ private:
         Interrupts.attach(UsartInterruptType::DataRegisterEmpty, handleTxInterrupt);
 
         /* RX'i ve TX'i etkinleştir*/
-        enableReceiver();
-        enableTransmitter();
+        Receiver.enable();
+        Transmitter.disable();
     }
     static void reset(){
         Interrupts.disable(UsartInterruptType::AllInterrupts);
-        disableReceiver();
-        disableTransmitter();
+        Receiver.disable();
+        Transmitter.disable();
         disableDoubleSpeed();
         Regs::Uart::UartBaudrateRegHByte = 0x00;
         Regs::Uart::UartBaudrateRegLByte = 0x00;

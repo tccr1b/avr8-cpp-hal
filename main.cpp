@@ -40,7 +40,7 @@ void sysReset(){
     builtinLed::toggle();
 }
 
-void timerCallback(){
+void toggleBuiltInLED(){
     builtinLed::toggle();
 }
 
@@ -108,7 +108,7 @@ int main (){
     timer0::init(timer0::Mode::FastPWM, timer0::Clock::DividedBy1024);
     timer0::setCompareValueA(127);
     timer0::ChannelA.setOutputMode(timer0::OutputMode::ClearPinOnCompareMatch).enable();
-    timer0::Interrupts.attach(timer0::InterruptType::OutputCompareMatchA, timerCallback).enable();
+    timer0::Interrupts.attach(timer0::InterruptType::OutputCompareMatchA, toggleBuiltInLED).enable();
     timer0::Interrupts.disable(timer0::InterruptType::OutputCompareMatchA);
     timer0::Interrupts.detach(timer0::InterruptType::OutputCompareMatchA).disable();
     timer0::Interrupts.enable(timer0::InterruptType::All);
@@ -117,6 +117,11 @@ int main (){
     using t1 = mcu::Timers::Timer1;
     t1::init(t1::Mode::FastPWM_10bit, t1::Clock::NoPrescaling);
     t1::ChannelA.setOutputMode(t1::OutputMode::ClearOnCompareMatch).enable();
+    t1::Interrupts.attach(t1::InterruptType::Overflow, toggleBuiltInLED);
+    t1::selectInputCaptureEdge(t1::CaptureEdge::Rising);
+    t1::NoiseCanceler.enable();
+
+
 
     using t2 = mcu::Timers::Timer2;
     t2::init(t2::Mode::FastPWM, t2::Clock::DividedBy8, t2::ClockSource::SystemClock);
@@ -138,7 +143,7 @@ int main (){
     mcu::Peripherals::Adc::setAdcClockPrescaler(AdcClock::DividedBy128);
     mcu::Peripherals::Adc::selectReference(AdcReference::Internal_1v1);
     mcu::Peripherals::Adc::setResultAdjust(AdcResultAdjust::Right);
-    mcu::Peripherals::Adc::ConversionCompletedInterrupt.attach(timerCallback);
+    mcu::Peripherals::Adc::ConversionCompletedInterrupt.attach(toggleBuiltInLED);
     mcu::Peripherals::Adc::AutoTriggering.selectSource(AdcAutoTriggerSource::ExternalIRQ0).enable();
     
     using adc = mcu::Peripherals::Adc;
@@ -146,7 +151,7 @@ int main (){
     adc::setAdcClockPrescaler(AdcClock::DividedBy128);
     adc::selectReference(AdcReference::Internal_1v1);
     adc::setResultAdjust(AdcResultAdjust::Right);
-    adc::ConversionCompletedInterrupt.attach(timerCallback);
+    adc::ConversionCompletedInterrupt.attach(toggleBuiltInLED);
     adc::AutoTriggering.selectSource(AdcAutoTriggerSource::FreeRunning).enable();
 
     adc::AdcConfig myAdcConf;
@@ -160,11 +165,28 @@ int main (){
     mcu::Peripherals::AnalogComp::Interrupt.attach(sysReset).enable();
 
     using Comparator = mcu::Peripherals::AnalogComp;
-    Comparator::Interrupt.selectMode(AcInterruptMode::InterruptOnFallingOutputEdge).attach(timerCallback).enable();
+    Comparator::Interrupt.selectMode(AcInterruptMode::InterruptOnFallingOutputEdge).attach(toggleBuiltInLED).enable();
     Comparator::disableDigitalInputBuffer(AcInput::Ain0);
     Comparator::setNegativeInputA1(AcA1Channel::AdcChNo0);
     Comparator::setPositiveInputA0(AcA0Channel::Ain0Pin);
     Comparator::enable();
+    
+    using spi = mcu::Peripherals::Spi;
+    spi::init(SpiMode::Master, 
+              SpiClock::DividedBy4,
+              SpiDataMode::Mode0);
+    spi::TransferCompletedInterrupt.attach(toggleBuiltInLED).enable();
+    spi::enable();
+    uint8_t receivedData = spi::transfer(0);
+
+    using i2c = mcu::Peripherals::Twi;
+    i2c::TwiInterrupt.attach(toggleBuiltInLED).enable();
+    i2c::GeneralCallRecognition.enable();
+    i2c::Acknowledge.disable();
+    i2c::StartCondition.enable();
+    i2c::StopCondition.disable();
+    i2c::TwiInterrupt.detach().disable();
+
     while(1){
 //        mcu::System::WatchdogTimer::reset();
         /* ArduinoUnoR3Pin:9 (PB1)*/

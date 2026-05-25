@@ -44,6 +44,12 @@ namespace Peripherals{
         constexpr static uint8_t bitmask_acsr_int_mode_bits     = (RegBits::Adc::ACSR_ACIS0|RegBits::Adc::ACSR_ACIS1);
         using Callback = void(*)(void);
         inline static Callback cbAcCallback = nullptr;
+        template<typename regAddr, uint8_t bitPosBitmask> struct Feature{
+            void enable()   {regAddr().setBitmask(bitPosBitmask);}
+            void disable()  {regAddr().clearBitmask(bitPosBitmask);}
+            [[nodiscard]] bool isEnabled(){return regAddr().readBit(bitPosBitmask);}
+        };
+
         struct AcInterrupt{
             void enable (){Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACIE);}
             void disable(){Regs::Adc::AnalogComparatorControlAndStatusReg.clearBitmask(RegBits::Adc::ACSR_ACIE);}
@@ -59,6 +65,9 @@ namespace Peripherals{
 
     public:
         static AcInterrupt Interrupt;
+        static AnalogComp::Feature<decltype(Regs::Adc::AnalogComparatorControlAndStatusReg), RegBits::Adc::ACSR_ACIC> InputCapture;
+
+
         static void setPositiveInputA0(AcA0Channel channel){
             static_cast<uint8_t>(channel)?
                 Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACBG):
@@ -97,12 +106,6 @@ namespace Peripherals{
         }
 /* On the Analog Comparator output (ACO), and this change confirms to the setting of the edge 
 detector, a capture will be triggered*/
-        static void enableInputCapture(){
-            Regs::Adc::AnalogComparatorControlAndStatusReg.setBitmask(RegBits::Adc::ACSR_ACIC);
-        }
-        static void disableInputCapture(){
-            Regs::Adc::AnalogComparatorControlAndStatusReg.clearBitmask(RegBits::Adc::ACSR_ACIC);
-        }
     };
 
 } // Peripherals

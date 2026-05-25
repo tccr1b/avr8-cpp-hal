@@ -385,6 +385,11 @@ namespace Timers{
         inline static Callback cbCompareMatchBCallback = nullptr;
         inline static Callback cbInputCaptureCallback  = nullptr;
         inline static Clock    currentClock;
+        template<typename regAddr, uint8_t bitPosBitmask> struct Feature{
+            void enable()   {regAddr().setBitmask(bitPosBitmask);}
+            void disable()  {regAddr().clearBitmask(bitPosBitmask);}
+            [[nodiscard]] bool isEnabled(){return regAddr().readBit(bitPosBitmask);}
+        };
         template<typename IOPin, uint8_t comBitPos, uint8_t focBitPos> struct OCPin{
             inline void enable (){IOPin::setPinMode(PinMode::Output);}
             inline void disable(){IOPin::setPinMode(PinMode::HighImpedance);}
@@ -404,6 +409,7 @@ namespace Timers{
     public:
         static OCPin<Gpio::PinOC1A, BITPOS_COM1A, BITPOS_FOC1A> ChannelA;
         static OCPin<Gpio::PinOC1B, BITPOS_COM1B, BITPOS_FOC1B> ChannelB;
+        static Timer1::Feature<decltype(Regs::Timers::Timer1::TimerCounterControlRegB), RegBits::Timers::Timer1::TCCR1B_ICNC1>  NoiseCanceler;
         struct{ //Interrupts
             void enable (InterruptType intType){Regs::Timers::Timer1::TimerInterruptMaskReg.setBitmask(static_cast<uint8_t>(intType));}
             void disable(InterruptType intType){Regs::Timers::Timer1::TimerInterruptMaskReg.clearBitmask(static_cast<uint8_t>(intType));}
@@ -465,12 +471,6 @@ namespace Timers{
             Regs::Timers::Timer1::TimerCounterControlRegA.writeMasked(static_cast<uint8_t>(mode), bitmask_tccra_wgm_bits);
             /* Write WGM bits on TCCR1B*/
             Regs::Timers::Timer1::TimerCounterControlRegB.writeMasked(static_cast<uint8_t>(mode), bitmask_tccrb_wgm_bits);
-        }
-        static void enableNoiseCanceller(){
-            mcu::Regs::Timers::Timer1::TimerCounterControlRegB.setBitmask(mcu::RegBits::Timers::Timer1::TCCR1B_ICNC1);
-        }
-        static void disableNoiseCanceller(){
-            mcu::Regs::Timers::Timer1::TimerCounterControlRegB.clearBitmask(mcu::RegBits::Timers::Timer1::TCCR1B_ICNC1);
         }
         static void selectInputCaptureEdge(CaptureEdge edge){
             if(static_cast<bool>(edge)){
