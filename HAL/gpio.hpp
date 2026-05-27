@@ -19,7 +19,7 @@ enum class PinMode : uint8_t{
 
 namespace HAL{  /* Template GpioPort & GpioPin*/
 
-    template<typename regDDRx, typename regPORTx, typename regPINx>
+    template<typename regDDRx, typename regPORTx, typename regPINx, typename regPCIC>
     struct GpioPort{
         using DDR  = regDDRx;
         using PORT = regPORTx;
@@ -33,7 +33,30 @@ namespace HAL{  /* Template GpioPort & GpioPin*/
     template<typename gpioPORT, uint8_t pinPosBitmask>
     struct GpioPin{        
         using is_gpio_pin = void; // Bu satır, bu sınıfın bir GpioPin olduğunu ispatlar
-
+        struct{ // Internal pull-up resistors
+            static bool enable(){
+                /* 3 Signals (PUD, DDxn, PORTxn) control the pull-ups */
+                /* Check whether corresponding pin is configured as input*/
+                if(PinMode::Input != getPinMode()) return false;
+                /* Enable pull-up resistors by deactivating PUD in the MCUCR*/
+                mcu::Regs::Core::McuControlReg.clearBitmask(mcu::RegBits::Core::MCUCR_PUD);
+                /* Write logic one to the corresponding pin which is configured as an input pin*/
+                gpioPORT::PortReg().setBitmask(pinPosBitmask);
+                return true;
+            };
+            static bool disable(){
+                /* Check whether corresponding pin is configured as input*/
+                if(PinMode::Input != getPinMode()) return false;
+                /* Write logic zero to the corresponding pin which is configured as an input pin*/
+                gpioPORT::PortReg().clearBitmask(pinPosBitmask);
+                return true;
+            };
+            [[nodiscard]] static bool isEnabled(){
+                return (!mcu::Regs::Core::McuControlReg.readBit(mcu::RegBits::Core::MCUCR_PUD) &&
+                        !gpioPORT::DataDirectionReg().readBit(pinPosBitmask) &&
+                         gpioPORT::PortReg().readBit(pinPosBitmask));
+            }
+        }static InputPullUp;
         static void     setPinMode(PinMode pin_mode){
             switch (pin_mode){
             case PinMode::Input:
@@ -62,28 +85,6 @@ namespace HAL{  /* Template GpioPort & GpioPin*/
             }else{
                 return gpioPORT::PortReg().readBit(pinPosBitmask) ? PinMode::Input : PinMode::HighImpedance;
             }
-        }
-        static bool     enableInputPullUp(){
-            /* 3 Signals (PUD, DDxn, PORTxn) control the pull-ups */
-            /* Check whether corresponding pin is configured as input*/
-            if(getPinMode() != PinMode::Input) return false;
-            /* Enable pull-up resistors by deactivating PUD in the MCUCR*/
-            mcu::Regs::Core::McuControlReg.clearBitmask(mcu::RegBits::Core::MCUCR_PUD);
-            /* Write logic one to the corresponding pin which is configured as an input pin*/
-            gpioPORT::PortReg().setBitmask(pinPosBitmask);
-            return true;
-        }
-        static bool     disableInputPullUp(){
-            /* Check whether corresponding pin is configured as input*/
-            if(getPinMode() != PinMode::Input) return false;
-            /* Write logic zero to the corresponding pin which is configured as an input pin*/
-            gpioPORT::PortReg().clearBitmask(pinPosBitmask);
-            return true;
-        }
-        static bool     isPullUpEnabled(){
-            return (!mcu::Regs::Core::McuControlReg.readBit(mcu::RegBits::Core::MCUCR_PUD) &&
-                    !gpioPORT::DataDirectionReg().readBit(pinPosBitmask) &&
-                    gpioPORT::PortReg().readBit(pinPosBitmask));
         }
         static uint8_t  getPortRegAddr()   {return gpioPORT::PortReg();}
         static uint8_t  getDataDirRegAddr(){return gpioPORT::DataDirectionReg();}
@@ -159,15 +160,18 @@ namespace Gpio{
 /* PORTB REGS*/
 using GpioPortB = HAL::GpioPort<decltype(Regs::Gpio::DataDirectionRegB), // DDRx
                                 decltype(Regs::Gpio::PortRegB),          // PORTx
-                                decltype(Regs::Gpio::InputPinAddrB)>;    // PINx
+                                decltype(Regs::Gpio::InputPinAddrB),
+                                decltype(Regs::Core::PinChangeInterruptControlReg)>;    // PINx
 /* PORTC REGS*/
 using GpioPortC = HAL::GpioPort<decltype(Regs::Gpio::DataDirectionRegC), // DDRx
                                 decltype(Regs::Gpio::PortRegC),          // PORTx
-                                decltype(Regs::Gpio::InputPinAddrC)>;    // PINx
+                                decltype(Regs::Gpio::InputPinAddrC),
+                                decltype(Regs::Core::PinChangeInterruptControlReg)>;    // PINx
 /* PORTD REGS*/
 using GpioPortD = HAL::GpioPort<decltype(Regs::Gpio::DataDirectionRegD), // DDRx
                                 decltype(Regs::Gpio::PortRegD),          // PORTx
-                                decltype(Regs::Gpio::InputPinAddrD)>;    // PINx
+                                decltype(Regs::Gpio::InputPinAddrD),
+                                decltype(Regs::Core::PinChangeInterruptControlReg)>;    // PINx
 /* PORTB PINS*/
 using PinPB0    = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_0>;
 using PinPB1    = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_1>;

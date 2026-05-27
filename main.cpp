@@ -19,8 +19,8 @@ using namespace mcu;
 using namespace HAL;
 
 
-const char myStr[] __attrib_section_progmem__ ={"asd"};
-const char myEepromStr[] __attrib_section_eeprom__ ={"ThisIsEepromData"};
+const char myStr[] __attrib_section_progmem__ ={"DataToBeSavedOnProgmem"};
+const char myEepromStr[] __attrib_section_eeprom__ ={"DataToBeSavedOnEEPROM"};
 
 void sysReset(){
     static uint8_t resetCount = 0;

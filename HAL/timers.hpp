@@ -44,7 +44,7 @@
 
 #include "registers.hpp"
 #include "HAL/sysctrl.hpp"
-#include "gpio.hpp"
+#include "HAL/gpio.hpp"
 #include "HAL/utils/atomicblock.hpp"
 
 using namespace mcu;

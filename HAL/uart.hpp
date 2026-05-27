@@ -15,7 +15,7 @@
 using namespace mcu;
 using namespace HAL;
 
-enum class UsartBaudrate    : uint32_t{
+enum class UsartBaudrate      : uint32_t{
     _2400bps   = 2400,
     _4800bps   = 4800,
     _9600bps   = 9600,
@@ -32,23 +32,23 @@ enum class UsartBaudrate    : uint32_t{
     _1Mbps     = 1000000,
     _2Mbps     = 2000000,
 };
-enum class UsartMode        : uint8_t{
+enum class UsartMode          : uint8_t{
     Asynchronous    = 0x00,
     Synchronous     = RegBits::Uart::UCSR0C_UMSEL00,
     MasterSPI       = RegBits::Uart::UCSR0C_UMSEL00 | 
                       RegBits::Uart::UCSR0C_UMSEL01,
 };
-enum class UsartSyncClockPol: uint8_t{
+enum class UsartSyncClockPol  : uint8_t{
     TxOnRisingRxOnFalling = 0, //Tx data changed on rising edge of XCK, Rx data sampled on falling edge
     TxOnFallingRxOnRising = 1, //Tx data changed on falling edge of XCK, Rx data sampled on rising edge
 };
-enum class UsartParityMode  : uint8_t{
+enum class UsartParityMode    : uint8_t{
     Disabled    = 0x00,
     EvenParity  = RegBits::Uart::UCSR0C_UPM01,
     OddParity   = RegBits::Uart::UCSR0C_UPM01 | 
                   RegBits::Uart::UCSR0C_UPM00,
 };
-enum class UsartDataSize    : uint8_t{
+enum class UsartDataSize      : uint8_t{
     //i.e. Character SiZe
     _5bit = 0,
     _6bit = 1,
@@ -56,15 +56,15 @@ enum class UsartDataSize    : uint8_t{
     _8bit = 3,
     _9bit = 4,
 };
-enum class UsartStopBits    : uint8_t{
+enum class UsartStopBits      : uint8_t{
     One = 0,
     Two = 1,
 };
-enum class UsartSPIDataOrder : uint8_t{
+enum class UsartSPIDataOrder  : uint8_t{
     MsbFirst = 0,
     LsbFirst = 1
 };
-enum class UsartInterruptType: uint8_t {
+enum class UsartInterruptType : uint8_t{
     RxComplete        = RegBits::Uart::UCSR0B_RXCIE0,
     TxComplete        = RegBits::Uart::UCSR0B_TXCIE0,
     DataRegisterEmpty = RegBits::Uart::UCSR0B_UDRIE0,
@@ -72,7 +72,7 @@ enum class UsartInterruptType: uint8_t {
                         RegBits::Uart::UCSR0B_TXCIE0 | 
                         RegBits::Uart::UCSR0B_UDRIE0,
 };
-enum class UsartSPIMode     : uint8_t{
+enum class UsartSPIMode       : uint8_t{
     Mode0 = 0x00,
     Mode1 = RegBits::Uart::UCSR0C_UCPHA0,
     Mode2 = RegBits::Uart::UCSR0C_UCPOL0,
@@ -107,7 +107,7 @@ private:
         constexpr uint8_t bitmask_usart_mode = ~(mcu::RegBits::Uart::UCSR0C_UMSEL00 | mcu::RegBits::Uart::UCSR0C_UMSEL01);
         Regs::Uart::UartControlAndStatusRegC.writeMasked(static_cast<uint8_t>(usartMode), bitmask_usart_mode);
         /* Disable X2 speed when using one of synchronous operation modes.*/
-        if(usartMode != UsartMode::Asynchronous) disableDoubleSpeed();
+        if(usartMode != UsartMode::Asynchronous) DoubleSpeed.disable();
         /* Clock Polarity (UCPOL0) bit is used for synchronous mode only. Write this bit to zero when asynchronous mode is used.*/
         if(usartMode == UsartMode::Asynchronous) setClockPolarity(UsartSyncClockPol::TxOnRisingRxOnFalling);
         /* The power reduction USART bit, PRUSART0 must be disabled by writing a logical zero to it.*/
@@ -119,16 +119,17 @@ private:
 
         return (static_cast<UsartMode>(newMode));
     }
-    inline static void enableDoubleSpeed(){
-        // Enable double speed only if baud rate is not yet set.
-        if (static_cast<uint8_t>(Regs::Uart::UartBaudrateRegLByte) == 0x00 && 
-            static_cast<uint8_t>(Regs::Uart::UartBaudrateRegHByte) == 0x00){
-            Regs::Uart::UartControlAndStatusRegA.setBitmask(RegBits::Uart::UCSR0A_U2X0);
+    struct{ //Double speed X2
+        void enable(){
+            // Enable double speed only if baudrate is not yet set.
+            if (static_cast<uint8_t>(Regs::Uart::UartBaudrateRegLByte) == 0x00 && 
+                static_cast<uint8_t>(Regs::Uart::UartBaudrateRegHByte) == 0x00){
+                Regs::Uart::UartControlAndStatusRegA.setBitmask(RegBits::Uart::UCSR0A_U2X0);
+            }
         }
-    }
-    inline static void disableDoubleSpeed(){
-        Regs::Uart::UartControlAndStatusRegA.clearBitmask(RegBits::Uart::UCSR0A_U2X0);
-    }
+        void disable(){Regs::Uart::UartControlAndStatusRegA.clearBitmask(RegBits::Uart::UCSR0A_U2X0);}
+        void isEnabled(){Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_U2X0);}
+    }static DoubleSpeed;
     static void setParityMode(UsartParityMode parityMode){
         constexpr uint8_t bitmask_parity_mode = ~(RegBits::Uart::UCSR0C_UPM00 | RegBits::Uart::UCSR0C_UPM01);
         Regs::Uart::UartControlAndStatusRegC.writeMasked(static_cast<uint8_t>(parityMode), bitmask_parity_mode);
@@ -202,18 +203,18 @@ private:
 
             if(abs(errorWithoutX2)>3){
                 /* Double Speed: U2X0:1*/
-                enableDoubleSpeed();
+                DoubleSpeed.enable();
                 modeDivisorConstant = 8;
             }else{
                 /* Normal Speed: U2X0:0*/
-                disableDoubleSpeed();
+                DoubleSpeed.disable();
                 modeDivisorConstant = 16;
             }
             }
             break;
         case UsartMode::Synchronous:
         case UsartMode::MasterSPI:
-            disableDoubleSpeed();
+            DoubleSpeed.disable();
             modeDivisorConstant = 2;
             break;
         }
@@ -357,7 +358,7 @@ private:
         Interrupts.disable(UsartInterruptType::AllInterrupts);
         Receiver.disable();
         Transmitter.disable();
-        disableDoubleSpeed();
+        DoubleSpeed.disable();
         Regs::Uart::UartBaudrateRegHByte = 0x00;
         Regs::Uart::UartBaudrateRegLByte = 0x00;
         rxBuffer.reset();
