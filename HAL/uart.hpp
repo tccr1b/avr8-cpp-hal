@@ -6,11 +6,12 @@
 #define TX_BUFFER_SIZE 64   //Byte (uint8_t)
 #define RX_BUFFER_SIZE 64   //Byte (uint8_t)
 
-#include "registers.hpp"
-#include "sysctrl.hpp"
-#include "utils/ring_buffer.hpp"
-#include "HAL/gpio.hpp"
 #include <math.h>
+
+#include "HAL/registers.hpp"
+#include "HAL/sysctrl.hpp"
+#include "HAL/utils/ring_buffer.hpp"
+#include "HAL/gpio.hpp"
 
 using namespace mcu;
 using namespace HAL;
@@ -79,7 +80,6 @@ enum class UsartSPIMode       : uint8_t{
     Mode3 = RegBits::Uart::UCSR0C_UCPHA0 | RegBits::Uart::UCSR0C_UCPOL0,
 };
 
-
 namespace mcu{
 namespace Peripherals{
 
@@ -100,8 +100,6 @@ private:
     static bool transmissionsCompleted(){
         return (!Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_RXC0) && 
                 Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_TXC0));
-//        return (!Regs::Uart::UcsrA.readBit(RegBits::Uart::UCSRA_RXC0) && 
-//                Regs::Uart::UcsrA.readBit(RegBits::Uart::UCSRA_TXC0));
     }
     static void setUsartMode(UsartMode usartMode){
         constexpr uint8_t bitmask_usart_mode = ~(mcu::RegBits::Uart::UCSR0C_UMSEL00 | mcu::RegBits::Uart::UCSR0C_UMSEL01);
@@ -242,6 +240,15 @@ private:
     }
 
     public:
+    struct Config{
+        UsartMode       usart_mode;
+        UsartBaudrate   usart_baud;
+        UsartDataSize   usart_data_size;
+        UsartStopBits   usart_stop_bits;
+        UsartParityMode usart_parity_mode;
+        bool            usart_tx_en;
+        bool            usart_rx_en;
+    };
     static void handleTxInterrupt(){
         uint8_t data;
         if(txBuffer.pop(data)){
@@ -263,7 +270,7 @@ private:
     static Usart::Feature<decltype(Regs::Uart::UartControlAndStatusRegB), RegBits::Uart::UCSR0B_TXEN0> Transmitter;
 
     /* Checking*/
-    [[nodiscard]] static bool isAvailable(){ return !rxBuffer.isEmpty();}
+    [[nodiscard]] static bool isAvailable(){return !rxBuffer.isEmpty();}
     [[nodiscard]] static bool isReceivingCompleted(){
         return Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_RXC0);
     }
@@ -323,28 +330,28 @@ private:
             }
         }
     }static Interrupts;
-    static void init(UsartMode       usartMode   = UsartMode::Asynchronous, 
-                     UsartBaudrate   baud        = UsartBaudrate::_9600bps, 
-                     UsartDataSize   dataSize    = UsartDataSize::_8bit, 
-                     UsartStopBits   stopBit     = UsartStopBits::One, 
-                     UsartParityMode parityMode  = UsartParityMode::Disabled){
+    static void init(UsartMode       usart_mode  = UsartMode::Asynchronous, 
+                     UsartBaudrate   baudrate    = UsartBaudrate::_9600bps, 
+                     UsartDataSize   data_size   = UsartDataSize::_8bit, 
+                     UsartStopBits   stop_bit    = UsartStopBits::One, 
+                     UsartParityMode parity_mode = UsartParityMode::Disabled){
         /* Activate usart0 in power reduction reg.*/
         mcu::System::Power::activatePeripheral(Peripheral::Usart0);
 
         /* Usart çalışma ayarı*/
-        setUsartMode(usartMode);
+        setUsartMode(usart_mode);
         
         /* Mode-specific settings*/
         /* Write this bit to zero when asynchronous mode is used*/
-        if(usartMode != UsartMode::Asynchronous){setClockPolarity(UsartSyncClockPol::TxOnFallingRxOnRising);}
+        if(usart_mode != UsartMode::Asynchronous){setClockPolarity(UsartSyncClockPol::TxOnFallingRxOnRising);}
         
         /* Baudrate settings */
-        setBaudrate(baud);
+        setBaudrate(baudrate);
 
         /* Frame ayarları*/
-        setDataSize(dataSize);
-        setParityMode(parityMode);
-        setStopBit(stopBit);
+        setDataSize(data_size);
+        setParityMode(parity_mode);
+        setStopBit(stop_bit);
 
         /**/
         Interrupts.attach(UsartInterruptType::RxComplete, handleRxInterrupt);
@@ -353,6 +360,21 @@ private:
         /* RX'i ve TX'i etkinleştir*/
         Receiver.enable();
         Transmitter.disable();
+    }
+    static void init(Config* cfg){
+        mcu::System::Power::activatePeripheral(Peripheral::Usart0);
+        setUsartMode (cfg->usart_mode);
+        setBaudrate  (cfg->usart_baud);
+        setDataSize  (cfg->usart_data_size);
+        setParityMode(cfg->usart_parity_mode);
+        setStopBit   (cfg->usart_stop_bits);
+
+        /* Configure interrupts for non-blocking usart usage*/
+        Interrupts.attach(UsartInterruptType::RxComplete, handleRxInterrupt);
+        Interrupts.attach(UsartInterruptType::DataRegisterEmpty, handleTxInterrupt);
+        
+        if(cfg->usart_rx_en) Receiver.enable();
+        if(cfg->usart_tx_en) Transmitter.enable();
     }
     static void reset(){
         Interrupts.disable(UsartInterruptType::AllInterrupts);

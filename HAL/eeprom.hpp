@@ -7,8 +7,7 @@
 #include "registers.hpp"
 //#include <avr/eeprom.h>
 #include <avr/interrupt.h>
-
-#define BITMASK_EEPROM_MODESEL  0xCF
+#include <avr/eeprom.h>
 
 using namespace mcu;
 
@@ -21,29 +20,31 @@ enum class EepromMode : uint8_t{
     WriteOnly     = RegBits::Eeprom::EECR_EEPM1,
 };
 enum class EepromFeature : uint8_t{
-    EepromReadyInterrupt= RegBits::Eeprom::EECR_EERIE,
     MasterWrite         = RegBits::Eeprom::EECR_EEMPE,
     Write               = RegBits::Eeprom::EECR_EEPE,
     Read                = RegBits::Eeprom::EECR_EERE,
 };
 struct EepromConfig{
-        EepromMode mode;
-        EepromFeature feat;
-};
-
-enum class EepromInterruptType : uint8_t{
-    EepromReady = 0,
+       EepromMode mode;
+       EepromFeature feat;
 };
 
 namespace mcu{
 class Eeprom{
 private:
+    constexpr static uint8_t bitmask_eecr_mode_sel_bits = RegBits::Eeprom::EECR_EEPM0|RegBits::Eeprom::EECR_EEPM1;
     using Callback = void(*)();
     inline static Callback cbEepromReadyCallback = nullptr;
     static inline bool isReady(){
         while(Regs::Eeprom::EepromControlReg.readBit(RegBits::Eeprom::EECR_EEPE));
         return true;
     }
+    template<typename regAddr, EepromFeature feat> struct Feature{
+        void enable() {regAddr().setBitmask(bitPosBitmask);}
+        void disable(){regAddr().clearBitmask(bitPosBitmask);}
+        [[nodiscard]] bool isEnabled(){return regAddr().readBit(bitPosBitmask);}
+    };
+
 public:
     struct{ //Interrupt
         void enable() {Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERIE);}
@@ -52,17 +53,14 @@ public:
         void detach() {cbEepromReadyCallback = nullptr;}
         void handle() {if(cbEepromReadyCallback) cbEepromReadyCallback();}
     }static EepromReadyInterrupt;
-    static void enable(EepromFeature feat){
-        Regs::Eeprom::EepromControlReg.setBitmask(static_cast<uint8_t>(feat));
-    }
-    static void disable(EepromFeature feat){
-        Regs::Eeprom::EepromControlReg.clearBitmask(static_cast<uint8_t>(feat));
-    }
+    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::MasterWrite>MasterWrite;
+    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::Write>Write;
+    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::Read>Read;
     static void setEepromMode(EepromMode mode){
-        Regs::Eeprom::EepromControlReg.writeMasked(static_cast<uint8_t>(mode), BITMASK_EEPROM_MODESEL);
+        Regs::Eeprom::EepromControlReg.writeMasked(static_cast<uint8_t>(mode), ~bitmask_eecr_mode_sel_bits);
     }
     static EepromMode getEepromMode(){
-        return static_cast<EepromMode>(~BITMASK_EEPROM_MODESEL & Regs::Eeprom::EepromControlReg.getValue());
+        return static_cast<EepromMode>(Regs::Eeprom::EepromControlReg.getValue(bitmask_eecr_mode_sel_bits));
     }
 
     /* Overloaded write functions*/

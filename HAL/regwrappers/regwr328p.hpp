@@ -120,38 +120,38 @@ namespace mcu {
     template<uintptr_t Addr>
         struct IoRegister{
             // Okuma Operatörü (uint8_t gibi davranır)
-            operator uint8_t() const volatile __attrib_always_inline__ {return *(volatile uint8_t*)Addr;}            
-            void operator=(uint8_t value)  const volatile __attrib_always_inline__{*(volatile uint8_t*)Addr =value;}
-            void operator|=(uint8_t value) const volatile __attrib_always_inline__{*(volatile uint8_t*)Addr |=value;}
-            void operator&=(uint8_t value) const volatile __attrib_always_inline__{*(volatile uint8_t*)Addr &=value;}
-            void operator^=(uint8_t value) const volatile __attrib_always_inline__{*(volatile uint8_t*)Addr ^=value;}
+            operator uint8_t() const volatile __atr_always_inline__ {return *(volatile uint8_t*)Addr;}            
+            void operator=(uint8_t value)  const volatile __atr_always_inline__{*(volatile uint8_t*)Addr =value;}
+            void operator|=(uint8_t value) const volatile __atr_always_inline__{*(volatile uint8_t*)Addr |=value;}
+            void operator&=(uint8_t value) const volatile __atr_always_inline__{*(volatile uint8_t*)Addr &=value;}
+            void operator^=(uint8_t value) const volatile __atr_always_inline__{*(volatile uint8_t*)Addr ^=value;}
             
-            inline void setBitmask   (uint8_t bitMask)  const volatile __attrib_always_inline__{
+            inline void setBitmask   (uint8_t bitMask)  const volatile __atr_always_inline__{
                 *this |= bitMask;
             }
-            inline void clearBitmask (uint8_t bitMask)  const volatile __attrib_always_inline__{
+            inline void clearBitmask (uint8_t bitMask)  const volatile __atr_always_inline__{
                 *this &= ~bitMask;
             }
-            inline void writeBitmask (uint8_t uByte)    const volatile __attrib_always_inline__{
+            inline void writeBitmask (uint8_t uByte)    const volatile __atr_always_inline__{
                 *this &= uByte;
             }
-            inline void writeMasked  (uint8_t uByte, uint8_t mask) const volatile __attrib_always_inline__{
+            inline void writeMasked  (uint8_t uByte, uint8_t mask) const volatile __atr_always_inline__{
                 *this &= mask; 
                 *this |= uByte;
             }
-            inline void toggleBitmask(uint8_t bitMask)  const volatile __attrib_always_inline__{
+            inline void toggleBitmask(uint8_t bitMask)  const volatile __atr_always_inline__{
                 *this ^= bitMask;
             }
-            inline bool readBit      (uint8_t bitMask)  const volatile __attrib_always_inline__{
+            inline bool readBit      (uint8_t bitMask)  const volatile __atr_always_inline__{
                 return (*this & bitMask);
             }
-            inline void setValue     (uint8_t value)    const volatile __attrib_always_inline__{
+            inline void setValue     (uint8_t value)    const volatile __atr_always_inline__{
                 *this = value;
             }
-            inline uint8_t getValue  ()                 const volatile __attrib_always_inline__{
+            inline uint8_t getValue  ()                 const volatile __atr_always_inline__{
                 return *this;
             }
-            inline uint8_t getValue  (uint8_t mask)     const volatile __attrib_always_inline__{
+            inline uint8_t getValue  (uint8_t mask)     const volatile __atr_always_inline__{
                 return (*this & mask);
             }
         };

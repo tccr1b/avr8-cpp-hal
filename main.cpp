@@ -11,7 +11,7 @@
 #include "HAL/adc.hpp"
 #include "HAL/twi.hpp"
 //#include "HAL/utils.hpp"
-//#include "HAL/eeprom.hpp"
+#include "HAL/eeprom.hpp"
 #include "HAL/timers.hpp"
 #include "HAL/analogcomp.hpp"
 
@@ -19,8 +19,8 @@ using namespace mcu;
 using namespace HAL;
 
 
-const char myStr[] __attrib_section_progmem__ ={"DataToBeSavedOnProgmem"};
-const char myEepromStr[] __attrib_section_eeprom__ ={"DataToBeSavedOnEEPROM"};
+const char myStr[] __atr_section_progmem__ ={"DataToBeSavedOnProgmem"};
+const char myEepromStr[] __atr_section_eeprom__ ={"DataToBeSavedOnEEPROM"};
 
 void sysReset(){
     static uint8_t resetCount = 0;
@@ -46,7 +46,7 @@ void toggleBuiltInLED(){
 
 int main (){    
 //    cstd::cout << "--------------" << cstd::endl;
-    mcu::System::Clock::setClockPrescaler(SysClock::NoDivision);
+    mcu::System::Clock::setClockPrescaler(SysClock::NoPrescaling);
     
     _delay_ms(10);
     mcu::Peripherals::Usart::init(UsartMode::Asynchronous,
@@ -54,7 +54,18 @@ int main (){
                                   UsartDataSize::_8bit,
                                   UsartStopBits::One,
                                   UsartParityMode::Disabled);
-    
+
+    using usart = mcu::Peripherals::Usart;
+    usart::Config coutCfg;
+        coutCfg.usart_baud       = UsartBaudrate::_9600bps;
+        coutCfg.usart_mode       = UsartMode::Asynchronous;
+        coutCfg.usart_data_size  = UsartDataSize::_8bit;
+        coutCfg.usart_stop_bits  = UsartStopBits::One;
+        coutCfg.usart_parity_mode= UsartParityMode::Disabled;
+        coutCfg.usart_tx_en      = true;
+        coutCfg.usart_rx_en      = true;
+    usart::init(&coutCfg);
+
     mcu::System::WatchdogTimer::Interrupt.attach(sysReset);
     mcu::System::WatchdogTimer::enable(WatchdogMode::InterruptAndSystemReset, WatchdogTimeout::_4sec);
     sei();
@@ -154,17 +165,34 @@ int main (){
     adc::ConversionCompletedInterrupt.attach(toggleBuiltInLED);
     adc::AutoTriggering.selectSource(AdcAutoTriggerSource::FreeRunning).enable();
 
-    adc::AdcConfig myAdcConf;
-        myAdcConf.adc_ats = AdcAutoTriggerSource::FreeRunning;
-        myAdcConf.adc_ch  = AdcChannel::InternalTempSensor;
-        myAdcConf.adc_clk = AdcClock::DividedBy128;
-        myAdcConf.adc_ref = AdcReference::Internal_1v1;
+    adc::Config myAdcConf;
+        myAdcConf.adc_auto_trig_src = AdcAutoTriggerSource::FreeRunning;
+        myAdcConf.adc_auto_trig_enable  = true;
+        myAdcConf.adc_channel       = AdcChannel::InternalTempSensor;
+        myAdcConf.adc_clock         = AdcClock::DividedBy128;
+        myAdcConf.adc_reference     = AdcReference::Internal_1v1;
+        myAdcConf.adc_result_adjust = AdcResultAdjust::Right;
     adc::init(&myAdcConf);
+
+    adc::Config tmpSensorCfg;
+        tmpSensorCfg.adc_auto_trig_enable = false;
+        tmpSensorCfg.adc_auto_trig_src = AdcAutoTriggerSource::FreeRunning;
+        tmpSensorCfg.adc_channel       = AdcChannel::InternalTempSensor;
+        tmpSensorCfg.adc_clock         = AdcClock::DividedBy128;
+        tmpSensorCfg.adc_reference     = AdcReference::Internal_1v1;
+        tmpSensorCfg.adc_result_adjust = AdcResultAdjust::Right;
+    adc::init(&tmpSensorCfg);
+
     
     mcu::Peripherals::AnalogComp::Interrupt.selectMode(AcInterruptMode::InterruptOnRisingOutputEdge);
     mcu::Peripherals::AnalogComp::Interrupt.attach(sysReset).enable();
 
     using Comparator = mcu::Peripherals::AnalogComp;
+    Comparator::Config myAcompCfg;
+        myAcompCfg.ac_a0_pos_ch = AcA0Channel::Ain0Pin;
+        myAcompCfg.ac_a1_neg_ch = AcA1Channel::Ain1Pin;
+    Comparator::init(&myAcompCfg);
+
     Comparator::Interrupt.selectMode(AcInterruptMode::InterruptOnFallingOutputEdge).attach(toggleBuiltInLED).enable();
     Comparator::disableDigitalInputBuffer(AcInput::Ain0);
     Comparator::setNegativeInputA1(AcA1Channel::AdcChNo0);
@@ -178,6 +206,13 @@ int main (){
     spi::TransferCompletedInterrupt.attach(toggleBuiltInLED).enable();
     spi::enable();
     uint8_t receivedData = spi::transfer(0);
+    spi::Config mySpiCfg;
+        mySpiCfg.spi_clock     = SpiClock::DividedBy4;
+        mySpiCfg.spi_mode      = SpiMode::Master;
+        mySpiCfg.spi_data_mode = SpiDataMode::Mode0;
+    
+    spi::init(&mySpiCfg);
+
 
     using i2c = mcu::Peripherals::Twi;
     i2c::TwiInterrupt.attach(toggleBuiltInLED).enable();
@@ -186,6 +221,10 @@ int main (){
     i2c::StartCondition.enable();
     i2c::StopCondition.disable();
     i2c::TwiInterrupt.detach().disable();
+    
+    Gpio::PinPC3::setPinMode(PinMode::Input);
+    Gpio::PinPC3::InputPullUp.enable();
+    Gpio::PinPC3::readPin();
 
     while(1){
 //        mcu::System::WatchdogTimer::reset();

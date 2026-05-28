@@ -18,8 +18,7 @@ enum class PinMode : uint8_t{
 };
 
 namespace HAL{  /* Template GpioPort & GpioPin*/
-
-    template<typename regDDRx, typename regPORTx, typename regPINx, typename regPCIC>
+    template<typename regDDRx, typename regPORTx, typename regPINx>
     struct GpioPort{
         using DDR  = regDDRx;
         using PORT = regPORTx;
@@ -51,7 +50,7 @@ namespace HAL{  /* Template GpioPort & GpioPin*/
                 gpioPORT::PortReg().clearBitmask(pinPosBitmask);
                 return true;
             };
-            [[nodiscard]] static bool isEnabled(){
+            [[gnu::always_inline, nodiscard]] inline static bool isEnabled(){
                 return (!mcu::Regs::Core::McuControlReg.readBit(mcu::RegBits::Core::MCUCR_PUD) &&
                         !gpioPORT::DataDirectionReg().readBit(pinPosBitmask) &&
                          gpioPORT::PortReg().readBit(pinPosBitmask));
@@ -90,10 +89,10 @@ namespace HAL{  /* Template GpioPort & GpioPin*/
         static uint8_t  getDataDirRegAddr(){return gpioPORT::DataDirectionReg();}
         static uint8_t  getInputRegAddr()  {return gpioPORT::InputReg();}
 
-        [[gnu::always_inline]] static inline void setHigh(){gpioPORT::PortReg().setBitmask(pinPosBitmask);}
-        [[gnu::always_inline]] static inline void setLow (){gpioPORT::PortReg().clearBitmask(pinPosBitmask);}
-        [[gnu::always_inline]] static inline void toggle (){gpioPORT::InputReg().setValue(pinPosBitmask);}
-        [[gnu::always_inline]] static inline bool readPin(){return gpioPORT::InputReg().readBit(pinPosBitmask);}
+        [[gnu::always_inline]] inline static void setHigh(){gpioPORT::PortReg().setBitmask(pinPosBitmask);}
+        [[gnu::always_inline]] inline static void setLow (){gpioPORT::PortReg().clearBitmask(pinPosBitmask);}
+        [[gnu::always_inline]] inline static void toggle (){gpioPORT::InputReg().setValue(pinPosBitmask);}
+        [[gnu::always_inline]] inline static bool readPin(){return gpioPORT::InputReg().readBit(pinPosBitmask);}
 };
 
     template<typename gpioPORT, uint8_t combinedMask>
@@ -160,18 +159,15 @@ namespace Gpio{
 /* PORTB REGS*/
 using GpioPortB = HAL::GpioPort<decltype(Regs::Gpio::DataDirectionRegB), // DDRx
                                 decltype(Regs::Gpio::PortRegB),          // PORTx
-                                decltype(Regs::Gpio::InputPinAddrB),
-                                decltype(Regs::Core::PinChangeInterruptControlReg)>;    // PINx
+                                decltype(Regs::Gpio::InputPinAddrB)>;    // PINx
 /* PORTC REGS*/
 using GpioPortC = HAL::GpioPort<decltype(Regs::Gpio::DataDirectionRegC), // DDRx
                                 decltype(Regs::Gpio::PortRegC),          // PORTx
-                                decltype(Regs::Gpio::InputPinAddrC),
-                                decltype(Regs::Core::PinChangeInterruptControlReg)>;    // PINx
+                                decltype(Regs::Gpio::InputPinAddrC)>;    // PINx
 /* PORTD REGS*/
 using GpioPortD = HAL::GpioPort<decltype(Regs::Gpio::DataDirectionRegD), // DDRx
                                 decltype(Regs::Gpio::PortRegD),          // PORTx
-                                decltype(Regs::Gpio::InputPinAddrD),
-                                decltype(Regs::Core::PinChangeInterruptControlReg)>;    // PINx
+                                decltype(Regs::Gpio::InputPinAddrD)>;    // PINx
 /* PORTB PINS*/
 using PinPB0    = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_0>;
 using PinPB1    = HAL::GpioPin<GpioPortB, RegBits::Gpio::PortB::PB_1>;

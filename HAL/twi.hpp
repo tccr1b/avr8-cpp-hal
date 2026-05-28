@@ -18,7 +18,7 @@ enum class TwiMode : uint8_t{
     Slave  = 1,
 };
 enum class TwiClock : uint8_t{
-    NoDivision  = 0x00,
+    NoPrescaling= 0x00,
     DividedBy4  = RegBits::Twi::TWSR_TWPS0,
     DividedBy16 = RegBits::Twi::TWSR_TWPS1,
     DividedBy64 = RegBits::Twi::TWSR_TWPS1 | RegBits::Twi::TWSR_TWPS0,
@@ -61,12 +61,12 @@ public:
     static Twi::Feature<decltype(Regs::Twi::TwiControlReg), RegBits::Twi::TWCR_TWSTA> StartCondition;
     static Twi::Feature<decltype(Regs::Twi::TwiControlReg), RegBits::Twi::TWCR_TWSTO> StopCondition;
 
-    static void setTwiClockPrescaler(TwiClock prescaler = TwiClock::NoDivision){
+    static void setTwiClockPrescaler(TwiClock prescaler = TwiClock::NoPrescaling){
         Regs::Twi::TwiStatusReg.writeBitmask(static_cast<uint8_t>(prescaler));
     }
-    [[gnu::flatten]] static void enable(){Regs::Twi::TwiControlReg.setBitmask(RegBits::Twi::TWCR_TWEN);}
-    [[gnu::flatten]] static void disable(){Regs::Twi::TwiControlReg.clearBitmask(RegBits::Twi::TWCR_TWEN);}
-    [[gnu::flatten]] static bool isEnabled(){return Regs::Twi::TwiControlReg.readBit(RegBits::Twi::TWCR_TWEN);}
+    static void enable   () __atr_flatten__{Regs::Twi::TwiControlReg.setBitmask(RegBits::Twi::TWCR_TWEN);}
+    static void disable  () __atr_flatten__{Regs::Twi::TwiControlReg.clearBitmask(RegBits::Twi::TWCR_TWEN);}
+    static bool isEnabled() __atr_flatten__{return Regs::Twi::TwiControlReg.readBit(RegBits::Twi::TWCR_TWEN);}
 };
 
 

@@ -25,7 +25,6 @@ enum class AdcReference        : uint8_t{
     External_Aref= 0x00,
 };
 enum class AdcClock            : uint8_t{
-    DividedBy_2  = 0x00,
     DividedBy2   = 0x01,
     DividedBy4   = 0x02,
     DividedBy8   = 0x03,
@@ -108,11 +107,14 @@ namespace Peripherals{
             [[nodiscard]] bool isEnabled(){return mcu::Regs::Adc::AdcControlAndStatusRegA.readBit(mcu::RegBits::Adc::ADCSRA_ADATE);}
         };
     public:
-        struct AdcConfig{
-            AdcReference adc_ref;
-            AdcChannel adc_ch;
-            AdcClock adc_clk;
-            AdcAutoTriggerSource adc_ats;
+        struct Config{
+            AdcReference adc_reference;
+            AdcChannel   adc_channel;
+            AdcClock     adc_clock;
+            AdcAutoTriggerSource adc_auto_trig_src;
+            AdcResultAdjust adc_result_adjust;
+            /* Enables auto trigerring when true*/
+            bool adc_auto_trig_enable = false;
         };
         struct{ //Interrupt
             void enable(){mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
@@ -134,7 +136,6 @@ namespace Peripherals{
             return static_cast<AdcChannel>(Regs::Adc::AdcMultiplexerSelectionReg.getValue(bitmask_admux_channel_sel_bits));
         }
         static void setAdcClockPrescaler(AdcClock adcPresc){
-            uint32_t fCpu = mcu::System::Clock::getCpuFrequency();
             mcu::Regs::Adc::AdcControlAndStatusRegA.writeMasked(static_cast<uint8_t>(adcPresc), ~bitmask_acsra_prescaler_bits);
         }
         static AdcClock getAdcClockPrescaler(){
@@ -191,11 +192,13 @@ namespace Peripherals{
             selectChannel(chan);
             enableAdc();
         }
-        static void init(AdcConfig* conf){
-            AutoTriggering.selectSource(conf->adc_ats).enable();
-            selectChannel(conf->adc_ch);
-            selectReference(conf->adc_ref);
-            setAdcClockPrescaler(conf->adc_clk);
+        static void init(Config* conf){
+            if(conf->adc_auto_trig_enable) AutoTriggering.selectSource(conf->adc_auto_trig_src).enable();
+            selectChannel(conf->adc_channel);
+            selectReference(conf->adc_reference);
+            setAdcClockPrescaler(conf->adc_clock);
+            setResultAdjust(conf->adc_result_adjust);
+            enableAdc();
         }
     };
 } // namespace Peripherals

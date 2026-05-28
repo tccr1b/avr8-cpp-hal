@@ -6,21 +6,23 @@
 
 #include <avr/boot.h>
 #include <avr/interrupt.h>
-#include "registers.hpp"
 #include <inttypes.h>
-#include "serialstream.hpp"
+
+#include "HAL/registers.hpp"
+#include "HAL/serialstream.hpp"
+#include "HAL/macros.hpp"
 
 
 enum class SleepMode : uint8_t{
     Idle              = 0x00,
     AdcNoiseReduction = RegBits::Core::SMCR_SM0,
     PowerDown         = RegBits::Core::SMCR_SM1,
-    PowerSave         = RegBits::Core::SMCR_SM0 | RegBits::Core::SMCR_SM1,
+    PowerSave         = RegBits::Core::SMCR_SM1 | RegBits::Core::SMCR_SM0,
     StandBy           = RegBits::Core::SMCR_SM2 | RegBits::Core::SMCR_SM1,
     ExtendedStandBy   = RegBits::Core::SMCR_SM2 | RegBits::Core::SMCR_SM1 | RegBits::Core::SMCR_SM0,
 };
 enum class SysClock  : uint8_t{
-    NoDivision  = 0x00,
+    NoPrescaling= 0x00,
     DividedBy2  = RegBits::Core::CLKPR_CLKPS0,
     DividedBy4  = RegBits::Core::CLKPR_CLKPS1,
     DividedBy8  = RegBits::Core::CLKPR_CLKPS0 | RegBits::Core::CLKPR_CLKPS1,
@@ -56,6 +58,14 @@ enum class ResetReason : uint8_t {
     Unknown     = 0
 };
 
+const char ck00[] __atr_section_progmem__ = {"External Clock"};
+const char ck02[] __atr_section_progmem__ = {"Calibrated Internal 8MHz RC Oscillator"};
+const char ck03[] __atr_section_progmem__ = {"Internal 128kHz RC Oscillator"};
+const char ck05[] __atr_section_progmem__ = {"Low Frequency Crystal Oscillator"};
+const char ck07[] __atr_section_progmem__ = {"Full Swing Crystal Oscillator"};
+const char ck0F[] __atr_section_progmem__ = {"Low Power Crystal Oscillator"};
+const char ckDef[]__atr_section_progmem__ = {"Unknown (or undefined) Clock Source"};
+
 namespace mcu{
 namespace System{
 
@@ -81,7 +91,7 @@ class Sleep{
         }
 };
 
-inline static void sleep(){
+[[gnu::flatten, always_inline]] inline static void sleep(){
     mcu::System::Sleep::enable();
     __asm__ __volatile__ ("sleep");
 }
@@ -181,7 +191,7 @@ public:
         /* Restore status reg */
         Regs::Core::StatusReg.setValue(sreg);
     }
-    static SysClock    getClockPrescaler(){
+    static SysClock     getClockPrescaler(){
         constexpr uint8_t bitmask_clk_prescaler = RegBits::Core::CLKPR_CLKPS3| 
                                                   RegBits::Core::CLKPR_CLKPS2|
                                                   RegBits::Core::CLKPR_CLKPS1|
@@ -199,18 +209,16 @@ public:
         uint8_t cksel   = getMasterClockSource();
 
         switch (cksel){
-        case 0x00: return "External Clock"; break;                         // CKSEL3..0 = 0000 0x00
-        case 0x02: return "Calibrated Internal 8MHz RC Oscillator"; break; // CKSEL3..0 = 0010 0x02
-        case 0x03: return "Internal 128kHz RC Oscillator"; break;          // CKSEL3..0 = 0011 0x03
-        case 0x04:                                                         // CKSEL3..0 = 0100 0x04
-        case 0x05: return "Low Frequency Crystal Oscillator"; break;       // CKSEL3..0 = 0101 0x05
-        case 0x06:                                                         // CKSEL3..0 = 0110 0x06
-        case 0x07: return "Full Swing Crystal Oscillator"; break;          // CKSEL3..0 = 0111 0x07
-        case 0x08:                                                         // CKSEL3..0 = 1000 - 1111 
-        case 0x0F: return "Low Power Crystal Oscillator"; break;
-        default:
-            return "Unknown (or undefined) Clock Source";
-            break;
+            case 0x00: return ck00; break; // CKSEL3..0 = 0000 0x00
+            case 0x02: return ck02; break; // CKSEL3..0 = 0010 0x02
+            case 0x03: return ck03; break; // CKSEL3..0 = 0011 0x03
+            case 0x04:                     // CKSEL3..0 = 0100 0x04
+            case 0x05: return ck05; break; // CKSEL3..0 = 0101 0x05
+            case 0x06:                     // CKSEL3..0 = 0110 0x06
+            case 0x07: return ck07; break; // CKSEL3..0 = 0111 0x07
+            case 0x08:                     // CKSEL3..0 = 1000 - 1111 
+            case 0x0F: return ck0F; break;
+            default  : return ckDef;break;
         }
     }
     static bool         isDividedBy8(){
@@ -218,12 +226,8 @@ public:
         return !(lowFuse & (1 << 7));
     }
     static void         calibrateInternalOscillator(){}
-    static void         setOscCalValue(uint8_t calVal){
-        mcu::Regs::Core::OscillatorCalibrationReg = calVal;
-    }
-    static uint8_t      getOscCalValue(){
-        return mcu::Regs::Core::OscillatorCalibrationReg;
-    }
+    static void         setOscCalValue(uint8_t calVal){mcu::Regs::Core::OscillatorCalibrationReg = calVal;}
+    static uint8_t      getOscCalValue(){return mcu::Regs::Core::OscillatorCalibrationReg;}
 };
 
 } //namespace System

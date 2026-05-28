@@ -97,6 +97,11 @@ private:
         void handle() {if(cbTransferCompletedCallback) cbTransferCompletedCallback();}
     };
 public:
+    struct Config{
+        SpiClock    spi_clock;
+        SpiDataMode spi_data_mode;
+        SpiMode     spi_mode;
+    };
     static SpiInterrupt TransferCompletedInterrupt;
     inline static bool isEnabled(){
         return Regs::Spi::SpiControlReg.readBit(RegBits::Spi::SPCR_SPE) && 
@@ -152,6 +157,9 @@ public:
 
         /* SPI modülünü etkinleştir*/
         enable();
+    }
+    static void init(Config* cfg){
+
     }
     static uint8_t transfer(uint8_t data){
         Regs::Spi::SpiDataReg.setValue(data);
