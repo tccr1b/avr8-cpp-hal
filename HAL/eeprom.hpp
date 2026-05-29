@@ -4,10 +4,12 @@
 // Sonra sil
 #define __AVR_ATmega328P__
 
-#include "registers.hpp"
-//#include <avr/eeprom.h>
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
+
+#include "HAL/registers.hpp"
+#include "HAL/utils/atomicblock.hpp"
+#include "HAL/macros.hpp"
 
 using namespace mcu;
 
@@ -24,28 +26,28 @@ enum class EepromFeature : uint8_t{
     Write               = RegBits::Eeprom::EECR_EEPE,
     Read                = RegBits::Eeprom::EECR_EERE,
 };
-struct EepromConfig{
-       EepromMode mode;
-       EepromFeature feat;
-};
 
 namespace mcu{
 class Eeprom{
 private:
-    constexpr static uint8_t bitmask_eecr_mode_sel_bits = RegBits::Eeprom::EECR_EEPM0|RegBits::Eeprom::EECR_EEPM1;
+    constexpr static uint8_t bitmask_eecr_mode_sel_bits = RegBits::Eeprom::EECR_EEPM0 | RegBits::Eeprom::EECR_EEPM1;
     using Callback = void(*)();
     inline static Callback cbEepromReadyCallback = nullptr;
-    static inline bool isReady(){
-        while(Regs::Eeprom::EepromControlReg.readBit(RegBits::Eeprom::EECR_EEPE));
-        return true;
+    static inline bool isBusy() __atr_always_inline__{
+        return Regs::Eeprom::EepromControlReg.readBit(RegBits::Eeprom::EECR_EEPE);
     }
     template<typename regAddr, EepromFeature feat> struct Feature{
-        void enable() {regAddr().setBitmask(bitPosBitmask);}
-        void disable(){regAddr().clearBitmask(bitPosBitmask);}
-        [[nodiscard]] bool isEnabled(){return regAddr().readBit(bitPosBitmask);}
+        void enable() {regAddr().setBitmask(static_cast<uint8_t>(feat));}
+        void disable(){regAddr().clearBitmask(static_cast<uint8_t>(feat));}
+        [[nodiscard]] bool isEnabled(){return regAddr().readBit(static_cast<uint8_t>(feat));}
     };
 
 public:
+    struct Config{
+        EepromMode eeprom_mode;
+        EepromFeature feat;
+    };
+
     struct{ //Interrupt
         void enable() {Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERIE);}
         void disable(){Regs::Eeprom::EepromControlReg.clearBitmask(RegBits::Eeprom::EECR_EERIE);}
@@ -64,12 +66,30 @@ public:
     }
 
     /* Overloaded write functions*/
-    static bool write(){
+    static bool write(uint16_t addr, uint8_t val){
+        /* Disable interrupt*/
+        AtomicBlock ab;
+        
+        /* Wait for completion of previous write*/
+        while(Eeprom::isBusy());
+        
+        /* Set up address reg*/
+        Regs::Eeprom::EepromAddressReg_HByte.setValue((uint8_t)(addr >> 8));
+        Regs::Eeprom::EepromAddressReg_LByte.setValue((uint8_t)(addr));
 
+        /* Set up data reg*/
+        Regs::Eeprom::EepromDataReg.setValue(val);
+
+        /* Start eeprom write by setting EEMPE and EEPE*/
+        Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEMPE);
+        Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEPE);
     }
+    static bool write(uint16_t addr, uint16_t val){}
+    static bool write(uint16_t addr, uint32_t val){}
+    static bool write(uint16_t addr, uint64_t val){}
 
     /* Overloaded read functions*/
-    static auto read(){
+    static uint8_t read(){
 
     }
 
@@ -111,7 +131,7 @@ public:
         /* Return data from Data Register */
         return Regs::Eeprom::EepromDataReg.getValue();
     }
-    static void init(EepromConfig* eepromCfg){
+    static void init(Config* eepromCfg){
     
     }
 };

@@ -124,7 +124,6 @@ namespace HAL{  /* Template GpioPort & GpioPin*/
             "HATA [static_assert @ VirtualPort]: VirtualPort en az 1 pin içermelidir!");
         
         static inline void setPortMode(PinMode pin_mode){(Pins::setPinMode(pin_mode), ...);}
-        
         static void write(uint16_t data){
             uint8_t bitPos = 0;
             ([&]{

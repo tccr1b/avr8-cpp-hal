@@ -44,7 +44,7 @@ namespace System{
             struct{
                 void attach(Callback cb) {cbInterruptCallback = cb;}
                 void detach() {cbInterruptCallback = nullptr;}
-                void handle(){if(cbInterruptCallback) cbInterruptCallback();}
+                inline void handle() __atr_always_inline__{if(cbInterruptCallback) cbInterruptCallback();}
             }static Interrupt;
             static void setTimeOut(WatchdogTimeout wdtTimeout){
                 /* Prepare new values for writing fast as much as possible*/

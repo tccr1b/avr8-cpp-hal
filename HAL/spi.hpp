@@ -159,7 +159,38 @@ public:
         enable();
     }
     static void init(Config* cfg){
+        switch (cfg->spi_mode){
+        case SpiMode::Slave:
+            /* Configure SPI pins for slave mode*/
+            mcu::Gpio::PinMISO::setPinMode(PinMode::Output);
+            mcu::Gpio::PinMOSI::setPinMode(PinMode::Input);
+            mcu::Gpio::PinSCK::setPinMode(PinMode::Input);
+            mcu::Gpio::PinSS::setPinMode(PinMode::Input);
+            break;
+        case SpiMode::Master:
+            /* Configure SPI pins for master mode. Avoid configuring SS pin as input*/
+            mcu::Gpio::PinMISO::setPinMode(PinMode::Input);
+            mcu::Gpio::PinMOSI::setPinMode(PinMode::Output);
+            mcu::Gpio::PinSCK::setPinMode(PinMode::Output);
 
+            /* If SS is configured as an output, the pin is a general output pin which 
+            does not affect the SPI system.*/
+            mcu::Gpio::PinSS::setPinMode(PinMode::Output);
+
+            uint8_t speedMask = static_cast<uint8_t>(cfg->spi_clock);
+            if(speedMask & 0x04){
+                Regs::Spi::SpiStatusReg.setBitmask(RegBits::Spi::SPSR_SPI2X);
+                speedMask &= ~0x04;
+                Regs::Spi::SpiControlReg.writeBitmask((0xFF << 2) | speedMask);     
+            }else{
+                Regs::Spi::SpiStatusReg.clearBitmask(RegBits::Spi::SPSR_SPI2X);
+                Regs::Spi::SpiControlReg.writeBitmask((0xFF << 2) | speedMask);
+            }
+            break;
+        }
+        setSpiMode  (cfg->spi_mode);
+        setDataMode (cfg->spi_data_mode);
+        enable();
     }
     static uint8_t transfer(uint8_t data){
         Regs::Spi::SpiDataReg.setValue(data);

@@ -96,18 +96,8 @@ class Sleep{
     __asm__ __volatile__ ("sleep");
 }
 
-struct BaseInterrupt{
-    void enable(){}
-    void disable(){}
-    void attach(){}
-    void detach(){}
-    void handle(){}
-};
 
-struct : BaseInterrupt {
-        void selectSensing(){}
-        void clearFlag(){}
-} static ExtInterrupt0;
+
 static void enableExternalInterrupt0(){
     Regs::Core::ExternalInterruptMaskReg.setBitmask(RegBits::Core::EIMSK_INT0);
 }

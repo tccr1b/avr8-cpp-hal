@@ -14,6 +14,7 @@
 #include "HAL/eeprom.hpp"
 #include "HAL/timers.hpp"
 #include "HAL/analogcomp.hpp"
+#include "HAL/extinterrupts.hpp"
 
 using namespace mcu;
 using namespace HAL;
@@ -221,10 +222,32 @@ int main (){
     i2c::StartCondition.enable();
     i2c::StopCondition.disable();
     i2c::TwiInterrupt.detach().disable();
+    i2c::GeneralCallRecognition.disable();
+    i2c::Config twiConf;
+        twiConf.ack_en = false;
+        twiConf.general_call_rec_en = false;
+        twiConf.start_cond_en = true;
+        twiConf.stop_cond_en = false;
+        twiConf.twi_clock = TwiClock::NoPrescaling;
+        twiConf.twi_mode = TwiMode::Master;
+    i2c::init(&twiConf);
     
     Gpio::PinPC3::setPinMode(PinMode::Input);
     Gpio::PinPC3::InputPullUp.enable();
     Gpio::PinPC3::readPin();
+    
+    ExternalInterrupt0.clearFlag();
+    ExternalInterrupt0.attach(toggleBuiltInLED).enable();
+    ExternalInterrupt0.selectSensing(ExtInterruptSense::IRQonAnyLogicalChange).attach(toggleBuiltInLED).enable();
+    mcu::ExternalInterrupt0.attach(toggleBuiltInLED).selectSensing(ExtInterruptSense::IRQonAnyLogicalChange).enable();
+
+    mcu::Gpio::GpioPortB::DataDirectionReg().setValue(0x0F);
+    mcu::Gpio::GpioPortB::PortReg().setValue(0x03);
+    mcu::Gpio::GpioPortC::InputReg().getValue();
+    mcu::Gpio::PinPB5::setPinMode(PinMode::Input);
+    mcu::Gpio::PinINT0::setPinMode(PinMode::Input);
+    mcu::Gpio::GpioPortB::DataDirectionReg().setValue(RegBits::Gpio::PortB::PB_5); // D13 pin is output, all other pins are input
+    mcu::Gpio::GpioPortB::PortReg().setBitmask(RegBits::Gpio::PortB::PB_5);
 
     while(1){
 //        mcu::System::WatchdogTimer::reset();

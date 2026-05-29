@@ -322,7 +322,7 @@ private:
             /* Disable related interrupt*/
             this->disable(intType);
         }
-        void handle(UsartInterruptType intType){
+        inline void handle(UsartInterruptType intType) __atr_always_inline__{
             switch (intType){
                 case UsartInterruptType::RxComplete       : if(cbRxCompleteCallback)        cbRxCompleteCallback()       ;break;
                 case UsartInterruptType::TxComplete       : if(cbTxCompleteCallback)        cbTxCompleteCallback()       ;break;

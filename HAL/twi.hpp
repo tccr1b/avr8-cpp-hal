@@ -50,11 +50,19 @@ private:
         void disable(){Regs::Twi::TwiControlReg.clearBitmask(RegBits::Twi::TWCR_TWIE);}
         Interrupt& attach(Callback cbFunc){cbTwiCallback = cbFunc; return *this;}
         Interrupt& detach(){cbTwiCallback = nullptr; return *this;}
-        void handle() {if(cbTwiCallback) cbTwiCallback(); this->clearFlag();}
+        inline void handle() __atr_always_inline__{if(cbTwiCallback) cbTwiCallback(); this->clearFlag();}
         /* Clear TWINT by writing a logic one (not by setting it to zero directly)*/
         void clearFlag(){Regs::Twi::TwiControlReg.setBitmask(RegBits::Twi::TWCR_TWINT);}
     };
 public:
+    struct Config{
+        TwiMode twi_mode;
+        TwiClock twi_clock;
+        bool general_call_rec_en;
+        bool ack_en;
+        bool start_cond_en;
+        bool stop_cond_en;
+    };
     static Twi::Interrupt TwiInterrupt;
     static Twi::Feature<decltype(Regs::Twi::TwiAddressReg), RegBits::Twi::TWAR_TWGCE> GeneralCallRecognition;
     static Twi::Feature<decltype(Regs::Twi::TwiControlReg), RegBits::Twi::TWCR_TWEA>  Acknowledge;
@@ -67,6 +75,14 @@ public:
     static void enable   () __atr_flatten__{Regs::Twi::TwiControlReg.setBitmask(RegBits::Twi::TWCR_TWEN);}
     static void disable  () __atr_flatten__{Regs::Twi::TwiControlReg.clearBitmask(RegBits::Twi::TWCR_TWEN);}
     static bool isEnabled() __atr_flatten__{return Regs::Twi::TwiControlReg.readBit(RegBits::Twi::TWCR_TWEN);}
+    static void init(TwiMode twi_mode){}
+    static void init(Twi::Config* cfg){
+        setTwiClockPrescaler(cfg->twi_clock);
+        if(cfg->ack_en) Acknowledge.enable();
+        if(cfg->general_call_rec_en) GeneralCallRecognition.enable();
+        if(cfg->start_cond_en) StartCondition.enable();
+        if(cfg->stop_cond_en) StopCondition.enable();
+    }
 };
 
 
