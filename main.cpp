@@ -3,6 +3,7 @@
 
 #include <util/delay.h>
 #include <avr/interrupt.h>
+
 #include "board.hpp"
 #include "HAL/watchdog.hpp"
 //#include "HAL/sysctrl.hpp"
@@ -240,6 +241,8 @@ int main (){
     ExternalInterrupt0.attach(toggleBuiltInLED).enable();
     ExternalInterrupt0.selectSensing(ExtInterruptSense::IRQonAnyLogicalChange).attach(toggleBuiltInLED).enable();
     mcu::ExternalInterrupt0.attach(toggleBuiltInLED).selectSensing(ExtInterruptSense::IRQonAnyLogicalChange).enable();
+    mcu::ExternalInterrupt1.disable();
+    mcu::ExternalInterrupt1.attach(sysReset).selectSensing(ExtInterruptSense::IRQonLowLevel).enable();
 
     mcu::Gpio::GpioPortB::DataDirectionReg().setValue(0x0F);
     mcu::Gpio::GpioPortB::PortReg().setValue(0x03);
@@ -248,7 +251,7 @@ int main (){
     mcu::Gpio::PinINT0::setPinMode(PinMode::Input);
     mcu::Gpio::GpioPortB::DataDirectionReg().setValue(RegBits::Gpio::PortB::PB_5); // D13 pin is output, all other pins are input
     mcu::Gpio::GpioPortB::PortReg().setBitmask(RegBits::Gpio::PortB::PB_5);
-
+    
     while(1){
 //        mcu::System::WatchdogTimer::reset();
         /* ArduinoUnoR3Pin:9 (PB1)*/

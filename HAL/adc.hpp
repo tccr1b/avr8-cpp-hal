@@ -122,6 +122,10 @@ namespace Peripherals{
             void attach(Callback callbackFunc){cbAdcConversionCompletedCallback = callbackFunc; this->enable();}
             void detach(){cbAdcConversionCompletedCallback = nullptr; this->disable();}
             [[gnu::always_inline]] inline void handler(){if(cbAdcConversionCompletedCallback) cbAdcConversionCompletedCallback();}
+        private:
+            static void __attribute__((flatten, signal(ADC_vect_num))) irqHandler(){
+                if(cbAdcConversionCompletedCallback) cbAdcConversionCompletedCallback();
+            }
         }static ConversionCompletedInterrupt;
         static AutoTrig AutoTriggering;
 

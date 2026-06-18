@@ -44,12 +44,7 @@ enum class Peripheral: uint8_t{
               RegBits::Core::PRR_PRTIM1| RegBits::Core::PRR_PRTIM2| RegBits::Core::PRR_PRTWI |
               RegBits::Core::PRR_PRUSART0,
 };
-enum class InterruptSense : uint8_t{
-    IRQonLowLevel         = 0x00, //Generate interrupt request on the low level of INTx
-    IRQonAnyLogicalChange = 0x01, //Generate interrupt request on any logical change of INTx
-    IRQonFallingEdge      = 0x02, //Generate interrupt request on falling edge of INTx
-    IRQonRisingEdge       = 0x03, //Generate interrupt request on rising edge of INTx
-};
+
 enum class ResetReason : uint8_t {
     PowerOn     = (1 << 0),
     External    = (1 << 1),
@@ -90,51 +85,6 @@ class Sleep{
             return Regs::Core::SleepModeControlReg.readBit(RegBits::Core::SMCR_SE);
         }
 };
-
-[[gnu::flatten, always_inline]] inline static void sleep(){
-    mcu::System::Sleep::enable();
-    __asm__ __volatile__ ("sleep");
-}
-
-
-
-static void enableExternalInterrupt0(){
-    Regs::Core::ExternalInterruptMaskReg.setBitmask(RegBits::Core::EIMSK_INT0);
-}
-static void enableExternalInterrupt1(){
-    Regs::Core::ExternalInterruptMaskReg.setBitmask(RegBits::Core::EIMSK_INT1);
-}
-static void disableExternalInterrupt0(){
-    Regs::Core::ExternalInterruptMaskReg.clearBitmask(RegBits::Core::EIMSK_INT0);
-}
-static void disableExternalInterrupt1(){
-    Regs::Core::ExternalInterruptMaskReg.clearBitmask(RegBits::Core::EIMSK_INT1);
-}
-static void setExtIntSensing0(InterruptSense intSense = InterruptSense::IRQonLowLevel){
-    Regs::Core::ExternalInterruptControlReg.writeBitmask(0xFC & static_cast<uint8_t>(intSense));
-}
-static void setExtIntSensing1(InterruptSense intSense = InterruptSense::IRQonLowLevel){
-    Regs::Core::ExternalInterruptControlReg.writeBitmask(0xF3 & (static_cast<uint8_t>(intSense) << 2));
-}
-static void clearExtIntFlag0(){
-    mcu::Regs::Core::ExternalInterruptFlagReg.setBitmask(RegBits::Core::EIFR_INTF0);
-}
-static void clearExtIntFlag1(){
-    mcu::Regs::Core::ExternalInterruptFlagReg.setBitmask(RegBits::Core::EIFR_INTF1);
-}
-static void setExtIntFlag0(){
-    if(!(mcu::Regs::Core::ExternalInterruptFlagReg & RegBits::Core::EIFR_INTF0)){
-        mcu::Regs::Core::ExternalInterruptFlagReg.setBitmask(RegBits::Core::EIFR_INTF0);
-    }
-}
-static void setExtIntFlag1(){
-    if(!(mcu::Regs::Core::ExternalInterruptFlagReg & RegBits::Core::EIFR_INTF1)){
-        mcu::Regs::Core::ExternalInterruptFlagReg.setBitmask(RegBits::Core::EIFR_INTF1);
-    }
-}
-static void attachInterrupt(){}
-static inline void globalInterruptEnable(){sei();}
-static inline void globalInterruptDisable(){cli();}
 
 class Fuses {
     public:
@@ -220,13 +170,31 @@ public:
     static uint8_t      getOscCalValue(){return mcu::Regs::Core::OscillatorCalibrationReg;}
 };
 
+class SysTick{
+private:
+    static volatile uint32_t _millis_counter;
+    static volatile inline uint32_t sys_freq = 0;
+public:
+    void init(uint16_t systick_interval_ms){
+
+    }
+
+};
+
 } //namespace System
 } //namespace mcu
 
 namespace mcu{
 namespace System{
-    void delayUs(uint16_t){/* Some delay functions*/};
-    void delayMs(uint16_t){/* Some delay functions*/};
+    static inline void delayUs(uint16_t){/* Some delay functions*/};
+    static inline void delayMs(uint16_t){/* Some delay functions*/};
+    static inline uint32_t getMillis()  {/* Code*/};
+    static inline void globalInterruptEnable(){sei();}
+    static inline void globalInterruptDisable(){cli();}
+    [[flatten, always_inline]] inline static void sleep(){
+        mcu::System::Sleep::enable();
+        __asm__ __volatile__ ("sleep");
+    }
 } // namespace System
 } // namespace mcu
 

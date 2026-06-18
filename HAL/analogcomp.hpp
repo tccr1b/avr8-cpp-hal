@@ -45,8 +45,8 @@ namespace Peripherals{
         using Callback = void(*)(void);
         inline static Callback cbAcCallback = nullptr;
         template<typename regAddr, uint8_t bitPosBitmask> struct Feature{
-            void enable()   {regAddr().setBitmask(bitPosBitmask);}
-            void disable()  {regAddr().clearBitmask(bitPosBitmask);}
+            void enable() {regAddr().setBitmask(bitPosBitmask);}
+            void disable(){regAddr().clearBitmask(bitPosBitmask);}
             [[nodiscard]] bool isEnabled(){return regAddr().readBit(bitPosBitmask);}
         };
 
@@ -60,6 +60,10 @@ namespace Peripherals{
             AcInterrupt& selectMode(AcInterruptMode ac_int_mode){
                 Regs::Adc::AnalogComparatorControlAndStatusReg.writeMasked(static_cast<uint8_t>(ac_int_mode), ~bitmask_acsr_int_mode_bits);
                 return *this;
+            }
+        private:
+            static void __attribute__((flatten, signal(ANALOG_COMP_vect_num))) irqHandler(){
+                if(cbAcCallback) cbAcCallback();
             }
         };
 

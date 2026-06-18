@@ -89,7 +89,7 @@ __GNUC_GNU_INLINE__ or __GNUC_STDC_INLINE__ are defined. See An Inline Function 
 
 In C++, this attribute does not depend on extern in any way, but it still requires the inline keyword to enable 
 its special behavior.*/
-#define __atr_gnu_inline__      __attribute__((gnu_inline))
+#define __atr_gnu_inline__       __attribute__((gnu_inline))
 /* ATTRIBUTE: NOINLINE
 This function attribute prevents a function from being considered for inlining. If the function does not have 
 side-effects, there are optimizations other than inlining that causes function calls to be optimized away, 
@@ -116,7 +116,7 @@ useful in defining library functions which can be overridden in user code, thoug
 non-function declarations. Weak symbols are supported for ELF targets, and also for a.out targets when using the 
 GNU assembler and linker.*/
 #define __atr_weak__             __attribute__((weak))
-#define __atr_warning__         __attribute__((warning("message")))
+#define __atr_warning__          __attribute__((warning("message")))
 /* ATTRIBUTE: SECTION
 Normally, the compiler places the code it generates in the text section. Sometimes, however, you need additional 
 sections, or you need certain particular functions to appear in special sections. The section attribute specifies 
@@ -137,4 +137,6 @@ kesilirse içindeki veri kaybolur.*/
 /* ATTRIBUTE: UNUSED
 This attribute, attached to a variable, means that the variable is meant to be possibly unused. GCC will not 
 produce a warning for this variable.*/
-#define __atr_unused__              __attribute__((unused))
+#define __atr_unused__           __attribute__((unused))
+
+#define __atr_signal(x)__      __attribute__((signal(x)))

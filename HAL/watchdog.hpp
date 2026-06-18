@@ -45,6 +45,10 @@ namespace System{
                 void attach(Callback cb) {cbInterruptCallback = cb;}
                 void detach() {cbInterruptCallback = nullptr;}
                 inline void handle() __atr_always_inline__{if(cbInterruptCallback) cbInterruptCallback();}
+            private:
+                static void __attribute__((flatten, signal(WDT_vect_num))) irqHandler(){
+                    if(cbInterruptCallback) cbInterruptCallback();
+                }
             }static Interrupt;
             static void setTimeOut(WatchdogTimeout wdtTimeout){
                 /* Prepare new values for writing fast as much as possible*/
