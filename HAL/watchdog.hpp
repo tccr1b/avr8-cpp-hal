@@ -6,6 +6,8 @@
 #include "registers.hpp"
 #include "macros.hpp"
 
+using namespace mcu;
+
 enum class WatchdogTimeout : uint8_t{
     _16ms  = 0x00,                       //0b1101 1000 WDP = ..0. .000
     _32ms  = RegBits::Core::WDTCSR_WDP0, //0b1101 1000 WDP = ..0. .001
@@ -44,7 +46,6 @@ namespace System{
             struct{
                 void attach(Callback cb) {cbInterruptCallback = cb;}
                 void detach() {cbInterruptCallback = nullptr;}
-                inline void handle() __atr_always_inline__{if(cbInterruptCallback) cbInterruptCallback();}
             private:
                 static void __attribute__((flatten, signal(WDT_vect_num))) irqHandler(){
                     if(cbInterruptCallback) cbInterruptCallback();
@@ -136,8 +137,5 @@ namespace System{
     };
 } //namespace System
 } //namespace mcu
-
-// Interrupt Service Routine for Watchdog
-ISR(WDT_vect){mcu::System::WatchdogTimer::Interrupt.handle();}
 
 #endif //WATCHDOG_TIMER_HPP

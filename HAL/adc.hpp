@@ -107,7 +107,7 @@ namespace Peripherals{
             [[nodiscard]] bool isEnabled(){return mcu::Regs::Adc::AdcControlAndStatusRegA.readBit(mcu::RegBits::Adc::ADCSRA_ADATE);}
         };
     public:
-        struct Config{
+        typedef struct{
             AdcReference adc_reference;
             AdcChannel   adc_channel;
             AdcClock     adc_clock;
@@ -115,7 +115,7 @@ namespace Peripherals{
             AdcResultAdjust adc_result_adjust;
             /* Enables auto trigerring when true*/
             bool adc_auto_trig_enable = false;
-        };
+        } config_t;
         struct{ //Interrupt
             void enable(){mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
             void disable(){mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
@@ -196,7 +196,7 @@ namespace Peripherals{
             selectChannel(chan);
             enableAdc();
         }
-        static void init(Config* conf){
+        static void init(config_t* conf){
             if(conf->adc_auto_trig_enable) AutoTriggering.selectSource(conf->adc_auto_trig_src).enable();
             selectChannel(conf->adc_channel);
             selectReference(conf->adc_reference);

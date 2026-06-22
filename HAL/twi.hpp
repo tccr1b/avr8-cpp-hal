@@ -55,14 +55,14 @@ private:
         void clearFlag(){Regs::Twi::TwiControlReg.setBitmask(RegBits::Twi::TWCR_TWINT);}
     };
 public:
-    struct Config{
+    typedef struct{
         TwiMode twi_mode;
         TwiClock twi_clock;
         bool general_call_rec_en;
         bool ack_en;
         bool start_cond_en;
         bool stop_cond_en;
-    };
+    }config_t;
     static Twi::Interrupt TwiInterrupt;
     static Twi::Feature<decltype(Regs::Twi::TwiAddressReg), RegBits::Twi::TWAR_TWGCE> GeneralCallRecognition;
     static Twi::Feature<decltype(Regs::Twi::TwiControlReg), RegBits::Twi::TWCR_TWEA>  Acknowledge;
@@ -76,7 +76,7 @@ public:
     static void disable  () __atr_flatten__{Regs::Twi::TwiControlReg.clearBitmask(RegBits::Twi::TWCR_TWEN);}
     static bool isEnabled() __atr_flatten__{return Regs::Twi::TwiControlReg.readBit(RegBits::Twi::TWCR_TWEN);}
     static void init(TwiMode twi_mode){}
-    static void init(Twi::Config* cfg){
+    static void init(Twi::config_t* cfg){
         setTwiClockPrescaler(cfg->twi_clock);
         if(cfg->ack_en) Acknowledge.enable();
         if(cfg->general_call_rec_en) GeneralCallRecognition.enable();

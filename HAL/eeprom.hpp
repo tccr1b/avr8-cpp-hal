@@ -43,10 +43,10 @@ private:
     };
 
 public:
-    struct Config{
+    typedef struct {
         EepromMode eeprom_mode;
         EepromFeature feat;
-    };
+    } config_t;
 
     struct{ //Interrupt
         void enable() {Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERIE);}
@@ -131,7 +131,7 @@ public:
         /* Return data from Data Register */
         return Regs::Eeprom::EepromDataReg.getValue();
     }
-    static void init(Config* eepromCfg){
+    static void init(config_t* eepromCfg){
     
     }
 };

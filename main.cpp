@@ -58,7 +58,7 @@ int main (){
                                   UsartParityMode::Disabled);
 
     using usart = mcu::Peripherals::Usart;
-    usart::Config coutCfg;
+    usart::config_t coutCfg;
         coutCfg.usart_baud       = UsartBaudrate::_9600bps;
         coutCfg.usart_mode       = UsartMode::Asynchronous;
         coutCfg.usart_data_size  = UsartDataSize::_8bit;
@@ -167,7 +167,7 @@ int main (){
     adc::ConversionCompletedInterrupt.attach(toggleBuiltInLED);
     adc::AutoTriggering.selectSource(AdcAutoTriggerSource::FreeRunning).enable();
 
-    adc::Config myAdcConf;
+    adc::config_t myAdcConf;
         myAdcConf.adc_auto_trig_src = AdcAutoTriggerSource::FreeRunning;
         myAdcConf.adc_auto_trig_enable  = true;
         myAdcConf.adc_channel       = AdcChannel::InternalTempSensor;
@@ -176,7 +176,7 @@ int main (){
         myAdcConf.adc_result_adjust = AdcResultAdjust::Right;
     adc::init(&myAdcConf);
 
-    adc::Config tmpSensorCfg;
+    adc::config_t tmpSensorCfg;
         tmpSensorCfg.adc_auto_trig_enable = false;
         tmpSensorCfg.adc_auto_trig_src = AdcAutoTriggerSource::FreeRunning;
         tmpSensorCfg.adc_channel       = AdcChannel::InternalTempSensor;
@@ -190,7 +190,7 @@ int main (){
     mcu::Peripherals::AnalogComp::Interrupt.attach(sysReset).enable();
 
     using Comparator = mcu::Peripherals::AnalogComp;
-    Comparator::Config myAcompCfg;
+    Comparator::config_t myAcompCfg;
         myAcompCfg.ac_a0_pos_ch = AcA0Channel::Ain0Pin;
         myAcompCfg.ac_a1_neg_ch = AcA1Channel::Ain1Pin;
     Comparator::init(&myAcompCfg);
@@ -208,7 +208,7 @@ int main (){
     spi::TransferCompletedInterrupt.attach(toggleBuiltInLED).enable();
     spi::enable();
     uint8_t receivedData = spi::transfer(0);
-    spi::Config mySpiCfg;
+    spi::config_t mySpiCfg;
         mySpiCfg.spi_clock     = SpiClock::DividedBy4;
         mySpiCfg.spi_mode      = SpiMode::Master;
         mySpiCfg.spi_data_mode = SpiDataMode::Mode0;
@@ -224,7 +224,7 @@ int main (){
     i2c::StopCondition.disable();
     i2c::TwiInterrupt.detach().disable();
     i2c::GeneralCallRecognition.disable();
-    i2c::Config twiConf;
+    i2c::config_t twiConf;
         twiConf.ack_en = false;
         twiConf.general_call_rec_en = false;
         twiConf.start_cond_en = true;
@@ -250,8 +250,8 @@ int main (){
     mcu::Gpio::PinPB5::setPinMode(PinMode::Input);
     mcu::Gpio::PinINT0::setPinMode(PinMode::Input);
     mcu::Gpio::GpioPortB::DataDirectionReg().setValue(RegBits::Gpio::PortB::PB_5); // D13 pin is output, all other pins are input
-    mcu::Gpio::GpioPortB::PortReg().setBitmask(RegBits::Gpio::PortB::PB_5);
-    
+    mcu::Gpio::GpioPortB::PortReg().setBitmask(RegBits::Gpio::PortB::PB_5);    
+
     while(1){
 //        mcu::System::WatchdogTimer::reset();
         /* ArduinoUnoR3Pin:9 (PB1)*/

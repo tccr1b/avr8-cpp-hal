@@ -240,7 +240,7 @@ private:
     }
 
     public:
-    struct Config{
+    typedef struct {
         UsartMode       usart_mode;
         UsartBaudrate   usart_baud;
         UsartDataSize   usart_data_size;
@@ -248,7 +248,7 @@ private:
         UsartParityMode usart_parity_mode;
         bool            usart_tx_en;
         bool            usart_rx_en;
-    };
+    } config_t;
     static void handleTxInterrupt(){
         uint8_t data;
         if(txBuffer.pop(data)){
@@ -361,7 +361,7 @@ private:
         Receiver.enable();
         Transmitter.disable();
     }
-    static void init(Config* cfg){
+    static void init(config_t* cfg){
         mcu::System::Power::activatePeripheral(Peripheral::Usart0);
         setUsartMode (cfg->usart_mode);
         setBaudrate  (cfg->usart_baud);

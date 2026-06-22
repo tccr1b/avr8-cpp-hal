@@ -97,11 +97,11 @@ private:
         void handle() {if(cbTransferCompletedCallback) cbTransferCompletedCallback();}
     };
 public:
-    struct Config{
+    typedef struct {
         SpiClock    spi_clock;
         SpiDataMode spi_data_mode;
         SpiMode     spi_mode;
-    };
+    } config_t;
     static SpiInterrupt TransferCompletedInterrupt;
     inline static bool isEnabled(){
         return Regs::Spi::SpiControlReg.readBit(RegBits::Spi::SPCR_SPE) && 
@@ -158,7 +158,7 @@ public:
         /* SPI modülünü etkinleştir*/
         enable();
     }
-    static void init(Config* cfg){
+    static void init(config_t* cfg){
         switch (cfg->spi_mode){
         case SpiMode::Slave:
             /* Configure SPI pins for slave mode*/

@@ -23,17 +23,14 @@ class SerialStream{
 private:
     uint8_t m_precision = 2;
 public:
-    // Karakter basma
     SerialStream& operator<<(char c){
         mcu::Peripherals::Usart::transmitData(c); // Sizin yazdığınız UART sürücüsü
         return *this;
     }
-    // Metin basma
     SerialStream& operator<<(const char* str){
         while (*str) mcu::Peripherals::Usart::transmitData(*str++);
         return *this;
     }
-    // Sayı basma (Integer)
     SerialStream& operator<<(int val) {
         char buffer[10];
         itoa(val, buffer, 10);
@@ -44,27 +41,17 @@ public:
         itoa(val, buffer, 10);
         return *this << buffer;
     }
-    // Sayı basma (Integer)
     SerialStream& operator<<(uint32_t val) {
         char buffer[12]; // 32-bit unsigned long için 10 hane + sign/null yeterlidir
         // itoa yerine ultoa kullanıyoruz
         ultoa(val, buffer, 10); 
         return *this << buffer;
     }
-    // Sayı basma (Integer)
     SerialStream& operator<<(uint8_t val) {
         char buffer[20];
         itoa(val, buffer, 10);
         return *this << buffer;
     }
-    void printHex(uint8_t val) {
-        const char hexChars[] = "0123456789ABCDEF";
-        mcu::Peripherals::Usart::transmitData('0');
-        mcu::Peripherals::Usart::transmitData('x');
-        mcu::Peripherals::Usart::transmitData(hexChars[(val >> 4) & 0x0F]);
-        mcu::Peripherals::Usart::transmitData(hexChars[val & 0x0F]);
-    }
-
     SerialStream& operator<<(SetPrecision sp){
         m_precision = sp.value;
         return *this;
@@ -80,16 +67,24 @@ public:
 
         return *this << buffer;
     }
-    // Fonksiyon işaretçisi alan operatör
     SerialStream& operator<<(SerialStream& (*func)(SerialStream&)){
         return func(*this);
     }
+    void printHex(uint8_t val) {
+        const char hexChars[] = "0123456789ABCDEF";
+        mcu::Peripherals::Usart::transmitData('0');
+        mcu::Peripherals::Usart::transmitData('x');
+        mcu::Peripherals::Usart::transmitData(hexChars[(val >> 4) & 0x0F]);
+        mcu::Peripherals::Usart::transmitData(hexChars[val & 0x0F]);
+    }
+
 }cout;
 
 inline SerialStream& endl(SerialStream& stream){
     stream << "\r\n";
     return stream;
 }
+
 
 
 } //namespace cstd

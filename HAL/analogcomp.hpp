@@ -68,12 +68,12 @@ namespace Peripherals{
         };
 
     public:
-        struct Config{
+        typedef struct {
             /* A0 input is positive (i.e. non-inverting) input of comparator*/
             AcA0Channel ac_a0_pos_ch;
             /* A1 input is negative (i.e. inverting) input of comparator*/
             AcA1Channel ac_a1_neg_ch;
-        };
+        } config_t;
         static AcInterrupt Interrupt;
         static AnalogComp::Feature<decltype(Regs::Adc::AnalogComparatorControlAndStatusReg), RegBits::Adc::ACSR_ACIC> InputCapture;
         static void setPositiveInputA0(AcA0Channel channel){
@@ -112,7 +112,7 @@ namespace Peripherals{
         static bool readOutput(){
             return Regs::Adc::AnalogComparatorControlAndStatusReg.readBit(RegBits::Adc::ACSR_ACO);
         }
-        static void init(Config* cfg){
+        static void init(config_t* cfg){
             setPositiveInputA0(cfg->ac_a0_pos_ch);
             setNegativeInputA1(cfg->ac_a1_neg_ch);
             enable();
