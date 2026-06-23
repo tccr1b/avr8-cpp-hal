@@ -9,9 +9,10 @@
 #include <inttypes.h>
 
 #include "HAL/registers.hpp"
-#include "HAL/serialstream.hpp"
+//#include "HAL/serialstream.hpp"
 #include "HAL/macros.hpp"
 
+using namespace mcu;
 
 enum class SleepMode : uint8_t{
     Idle              = 0x00,

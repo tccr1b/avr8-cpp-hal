@@ -56,7 +56,7 @@ namespace Peripherals{
             inline bool  isEnabled(){return Regs::Adc::AnalogComparatorControlAndStatusReg.readBit(RegBits::Adc::ACSR_ACIE);}
             AcInterrupt& attach(Callback cbFunc){cbAcCallback = cbFunc; return *this;}
             AcInterrupt& detach(){cbAcCallback = nullptr; return *this;}
-            inline void  handle(){if(cbAcCallback) cbAcCallback();}
+//            inline void  handle(){if(cbAcCallback) cbAcCallback();}
             AcInterrupt& selectMode(AcInterruptMode ac_int_mode){
                 Regs::Adc::AnalogComparatorControlAndStatusReg.writeMasked(static_cast<uint8_t>(ac_int_mode), ~bitmask_acsr_int_mode_bits);
                 return *this;
@@ -124,6 +124,6 @@ detector, a capture will be triggered*/
 } // Peripherals
 } // mcu
 
-ISR(ANALOG_COMP_vect){mcu::Peripherals::AnalogComp::Interrupt.handle();}
+//ISR(ANALOG_COMP_vect){mcu::Peripherals::AnalogComp::Interrupt.handle();}
 
 #endif // ANALOG_COMP_HPP

@@ -2,9 +2,10 @@
 #define ADC_HPP
 
 #define __AVR_ATmega328P__
-#include "macros.hpp"
-#include "registers.hpp"
-#include "sysctrl.hpp"
+
+#include "HAL/macros.hpp"
+#include "HAL/registers.hpp"
+#include "HAL/sysctrl.hpp"
 #include "HAL/utils/atomicblock.hpp"
 
 #define BITMASK_ADC_REF         0x3F
@@ -121,7 +122,6 @@ namespace Peripherals{
             void disable(){mcu::Regs::Adc::AdcControlAndStatusRegA.clearBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
             void attach(Callback callbackFunc){cbAdcConversionCompletedCallback = callbackFunc; this->enable();}
             void detach(){cbAdcConversionCompletedCallback = nullptr; this->disable();}
-            [[gnu::always_inline]] inline void handler(){if(cbAdcConversionCompletedCallback) cbAdcConversionCompletedCallback();}
         private:
             static void __attribute__((flatten, signal(ADC_vect_num))) irqHandler(){
                 if(cbAdcConversionCompletedCallback) cbAdcConversionCompletedCallback();
@@ -218,7 +218,5 @@ void foof(){
     mcu::Peripherals::Adc::enableAdc();
     mcu::Peripherals::Adc::read();
 }
-
-ISR(ADC_vect){mcu::Peripherals::Adc::ConversionCompletedInterrupt.handler();}
 
 #endif // ADC_HPP

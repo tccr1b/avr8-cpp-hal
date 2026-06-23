@@ -1,0 +1,3 @@
+---| HAFIZA KULLANIMI |---
+      text       data        bss      total filename
+       360          2          3        365 main.elf

@@ -4,8 +4,8 @@
 
 #include <avr/delay.h>
 
-#include "../../HAL/watchdog.hpp"
-#include "../../HAL/gpio.hpp"
+#include "HAL/watchdog.hpp"
+#include "HAL/gpio.hpp"
 
 using builtInLed = mcu::Gpio::PinPB5;   /* LED is on pin PB5*/
 using watchdog   = mcu::System::WatchdogTimer;
@@ -25,13 +25,15 @@ int main(){
     builtInLed::setPinMode(PinMode::Output);
     builtInLed::setLow();
     
-    /* Initialize watchdog timer*/
+    /* Enable watchdog timer*/
     watchdog::enable(WatchdogMode::InterruptAndSystemReset, WatchdogTimeout::_1sec);
 
     /* Attach irq routine*/
     watchdog::Interrupt.attach(wdtInterruptRoutine);
     watchdog::reset();
 
-    /* Never reset watchdog timer (for testing purposes)*/
+    /* Do not reset watchdog timer (for testing purposes)*/
     while(true){}
+
+    return 0;
 }
