@@ -30,9 +30,12 @@ ELF         = $(TARGET).elf
 HEX         = $(TARGET).hex
 LSS			= $(TARGET).lss
 
+STATS_FILENAME = stats
+
 # CFLAGS: -std=c++17 eklenmiştir
 #CFLAGS = -Wall -Wextra -g -Os -mmcu=$(DEVICE) -DF_CPU=$(F_CPU) -I. -std=c++17
 CXXFLAGS = -Wall -Wextra -g -Os -mmcu=$(DEVICE) -DF_CPU=$(F_CPU) -I../.. -std=c++17
+CXXFLAGS += -flto -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -Wl,--gc-sections
 
 # Avrdude Bayrakları
 AVRDUDE_FLAGS = -c $(PROGRAMMER) -p $(DEVICE) -P $(PORT) -b $(BAUDRATE)
@@ -73,4 +76,18 @@ clean:
 	@echo "---| TEMİZLENİYOR |---"
 	rm -f $(OBJS) $(ELF) $(HEX)
 
-.PHONY: all clean upload
+stats:
+	@echo > $(STATS_FILENAME).txt
+	date >> $(STATS_FILENAME).txt
+	@echo "---| HAFIZA KULLANIMI |---" >> $(STATS_FILENAME).txt
+	$(SIZE) --format=gnu $(ELF) >> $(STATS_FILENAME).txt
+	@echo >> $(STATS_FILENAME).txt
+	@echo "Compiler/Linker Params (CXXFLAGS/LDFLAGS):" >> $(STATS_FILENAME).txt
+	@echo "    " $(CXXFLAGS) >> $(STATS_FILENAME).txt
+	@echo "Toolchain Version:" >> $(STATS_FILENAME).txt
+	$(CC) --version >> $(STATS_FILENAME).txt
+
+disas:
+	avrdis $(TARGET).hex > $(TARGET).S
+
+.PHONY: all clean upload stats disas

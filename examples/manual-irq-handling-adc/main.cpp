@@ -26,13 +26,13 @@ int main(){
     builtInLed::setLow();
 
     /* configure adc for reading on-chip temperature sensor (PDIP package) and initialize it*/
-    adc::config_t adc_cfg;
-        adc_cfg.adc_auto_trig_enable= false;
-        adc_cfg.adc_channel         = AdcChannel::InternalTempSensor;
-        adc_cfg.adc_clock           = AdcClock::DividedBy128;   // 125kHz @ 16MHz
-        adc_cfg.adc_reference       = AdcReference::Internal_1v1;
-        adc_cfg.adc_result_adjust   = AdcResultAdjust::Right;   // i.e. ADLAR setting
-    adc::init(&adc_cfg);
+    adc::config_t adcConfig;
+        adcConfig.adc_auto_trig_enable= false;
+        adcConfig.adc_channel         = AdcChannel::InternalTempSensor;
+        adcConfig.adc_clock           = AdcClock::DividedBy128;   // 125kHz @ 16MHz
+        adcConfig.adc_reference       = AdcReference::Internal_1v1;
+        adcConfig.adc_result_adjust   = AdcResultAdjust::Right;   // i.e. ADLAR setting
+    adc::init(&adcConfig);
 
     /* attach function executed on interrupt request*/
     adc::ConversionCompletedInterrupt.attach(adcInterruptRoutine);

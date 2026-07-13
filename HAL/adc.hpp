@@ -8,12 +8,6 @@
 #include "HAL/sysctrl.hpp"
 #include "HAL/utils/atomicblock.hpp"
 
-#define BITMASK_ADC_REF         0x3F
-#define BITMASK_ADC_AUTOTRIGSRC 0xF8
-#define BITMASK_ADC_CHANNELSEL  0xF0
-#define BITMASK_ADC_PRESCALER   0xF8
-#define BITMASK_ADC_DIDR        0x3F
-
 using namespace mcu;
 
 enum class AdcReference        : uint8_t{
@@ -76,18 +70,21 @@ namespace mcu{
 namespace Peripherals{
     class Adc{
     private:
-        constexpr static uint8_t bitmask_acsra_prescaler_bits   = (RegBits::Adc::ADCSRA_ADPS0| 
-                                                                   RegBits::Adc::ADCSRA_ADPS1| 
+        constexpr static uint8_t bitmask_acsra_prescaler_bits   = (RegBits::Adc::ADCSRA_ADPS0|
+                                                                   RegBits::Adc::ADCSRA_ADPS1|
                                                                    RegBits::Adc::ADCSRA_ADPS2);
         constexpr static uint8_t bitmask_acsrb_trigger_sel_bits = (RegBits::Adc::ADCSRB_ADTS0|
                                                                    RegBits::Adc::ADCSRB_ADTS1|
                                                                    RegBits::Adc::ADCSRB_ADTS2);
-        constexpr static uint8_t bitmask_admux_ref_sel_bits     = (RegBits::Adc::ADMUX_REFS0|
-                                                                   RegBits::Adc::ADMUX_REFS1);
+        constexpr static uint8_t bitmask_admux_ref_sel_bits     = (RegBits::Adc::ADMUX_REFS0|RegBits::Adc::ADMUX_REFS1);
         constexpr static uint8_t bitmask_admux_channel_sel_bits = (RegBits::Adc::ADMUX_MUX0|
                                                                    RegBits::Adc::ADMUX_MUX1|
                                                                    RegBits::Adc::ADMUX_MUX2|
                                                                    RegBits::Adc::ADMUX_MUX3);
+        constexpr static uint8_t bitmask_didr_digital_in_buffer = (RegBits::Adc::DIDR0_ADC0D|RegBits::Adc::DIDR0_ADC1D|
+                                                                   RegBits::Adc::DIDR0_ADC2D|RegBits::Adc::DIDR0_ADC3D|
+                                                                   RegBits::Adc::DIDR0_ADC4D|RegBits::Adc::DIDR0_ADC5D);
+        
         using Callback = void(*)();
         inline static Callback cbAdcConversionCompletedCallback = nullptr;
         template<typename regAddr, uint8_t bitPosBitmask> struct Feature{
@@ -164,12 +161,12 @@ namespace Peripherals{
         }
         static void disableDigitalInputBuffer(AdcChannel adc_channel){
             uint8_t channel_pos = 1 << static_cast<uint8_t>(adc_channel);
-            if(channel_pos & BITMASK_ADC_DIDR) return;
+            if(channel_pos & bitmask_didr_digital_in_buffer) return;
             mcu::Regs::Adc::DigitalInputDisableReg0.setBitmask(1 << static_cast<uint8_t>(adc_channel));
         }
         static void enableDigitalInputBuffer(AdcChannel adc_channel){
             uint8_t channel_pos = 1 << static_cast<uint8_t>(adc_channel);
-            if(channel_pos & BITMASK_ADC_DIDR) return;
+            if(channel_pos & bitmask_didr_digital_in_buffer) return;
             mcu::Regs::Adc::DigitalInputDisableReg0.clearBitmask(1 << channel_pos);
         }
         static void setResultAdjust(AdcResultAdjust adj){
@@ -207,16 +204,5 @@ namespace Peripherals{
     };
 } // namespace Peripherals
 } // namespace mcu
-
-
-void foof(){
-    mcu::Peripherals::Adc::setAdcClockPrescaler(AdcClock::DividedBy32);
-    mcu::Peripherals::Adc::selectChannel(AdcChannel::InternalTempSensor);
-    mcu::Peripherals::Adc::disableDigitalInputBuffer(AdcChannel::No0);
-    mcu::Peripherals::Adc::getActiveChannel();
-    mcu::Peripherals::Adc::selectChannel(AdcChannel::No7);
-    mcu::Peripherals::Adc::enableAdc();
-    mcu::Peripherals::Adc::read();
-}
 
 #endif // ADC_HPP

@@ -124,6 +124,4 @@ detector, a capture will be triggered*/
 } // Peripherals
 } // mcu
 
-//ISR(ANALOG_COMP_vect){mcu::Peripherals::AnalogComp::Interrupt.handle();}
-
 #endif // ANALOG_COMP_HPP

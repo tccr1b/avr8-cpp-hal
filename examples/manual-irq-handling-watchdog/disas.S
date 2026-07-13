@@ -1,0 +1,150 @@
+    .org 0x0000
+L0: jmp L1
+    jmp L4
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0054
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+    .dw 0x940c
+    .dw 0x0046
+L1: clr r1
+    out 0x3f, r1
+    ser r28
+    ldi r29, 8
+    out 0x3e, r29
+    out 0x3d, r28
+    ldi r18, 1
+    ldi r26, 0
+    ldi r27, 1
+    rjmp L3
+L2: st X+, r1
+L3: cpi r26, 2
+    cpc r27, r18
+    brne L2
+    call L5
+    jmp L7
+L4: jmp L0
+    .dw 0xe280
+    .dw 0xb983
+    .dw 0xef2f
+    .dw 0xe730
+    .dw 0xe092
+    .dw 0x5021
+    .dw 0x4030
+    .dw 0x4090
+    .dw 0xf7e1
+    .dw 0xc000
+    .dw 0x0000
+    .dw 0xcff5
+    .dw 0x921f
+    .dw 0x920f
+    .dw 0xb60f
+    .dw 0x920f
+    .dw 0x2411
+    .dw 0x932f
+    .dw 0x933f
+    .dw 0x934f
+    .dw 0x935f
+    .dw 0x936f
+    .dw 0x937f
+    .dw 0x938f
+    .dw 0x939f
+    .dw 0x93af
+    .dw 0x93bf
+    .dw 0x93ef
+    .dw 0x93ff
+    .dw 0x91e0
+    .dw 0x0100
+    .dw 0x91f0
+    .dw 0x0101
+    .dw 0x9730
+    .dw 0xf009
+    .dw 0x9509
+    .dw 0x91ff
+    .dw 0x91ef
+    .dw 0x91bf
+    .dw 0x91af
+    .dw 0x919f
+    .dw 0x918f
+    .dw 0x917f
+    .dw 0x916f
+    .dw 0x915f
+    .dw 0x914f
+    .dw 0x913f
+    .dw 0x912f
+    .dw 0x900f
+    .dw 0xbe0f
+    .dw 0x900f
+    .dw 0x901f
+    .dw 0x9518
+L5: sei
+    cbi 0x05, 5
+    sbi 0x04, 5
+    cbi 0x05, 5
+    in r24, 0x3f
+    cli
+    wdr
+    ldi r25, 24
+    sts 0x60, r25
+    ldi r18, 14
+    sts 0x60, r18
+    out 0x3f, r24
+    lds r24, 0x60
+    in r18, 0x3f
+    cli
+    wdr
+    sts 0x60, r25
+    andi r24, 39
+    ori r24, 72
+    sts 0x60, r24
+    out 0x3f, r18
+    ldi r24, 72
+    ldi r25, 0
+    sts 0x100, r24
+    sts 0x101, r25
+    wdr
+L6: rjmp L6
+L7: cli
+L8: rjmp L8

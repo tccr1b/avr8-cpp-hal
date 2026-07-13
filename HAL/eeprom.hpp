@@ -33,7 +33,7 @@ private:
     constexpr static uint8_t bitmask_eecr_mode_sel_bits = RegBits::Eeprom::EECR_EEPM0 | RegBits::Eeprom::EECR_EEPM1;
     using Callback = void(*)();
     inline static Callback cbEepromReadyCallback = nullptr;
-    static inline bool isBusy() __atr_always_inline__{
+    [[gnu::always_inline, flatten]] static inline bool isBusy(){
         return Regs::Eeprom::EepromControlReg.readBit(RegBits::Eeprom::EECR_EEPE);
     }
     template<typename regAddr, EepromFeature feat> struct Feature{
@@ -41,6 +41,20 @@ private:
         void disable(){regAddr().clearBitmask(static_cast<uint8_t>(feat));}
         [[nodiscard]] bool isEnabled(){return regAddr().readBit(static_cast<uint8_t>(feat));}
     };
+    template<typename T>
+    static bool write(uint16_t address, T value){
+        while(Eeprom::isBusy());
+        
+        {AtomicBlock ab;
+            Regs::Eeprom::EepromAddressReg_HByte.setValue((uint8_t)(address >> 8));
+            Regs::Eeprom::EepromAddressReg_LByte.setValue((uint8_t)(address));
+
+            Regs::Eeprom::EepromDataReg.setValue(T);
+
+            Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEMPE);
+            Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEPE);
+        }
+    }
 
 public:
     typedef struct {
@@ -53,7 +67,10 @@ public:
         void disable(){Regs::Eeprom::EepromControlReg.clearBitmask(RegBits::Eeprom::EECR_EERIE);}
         void attach(Callback cbFunc){cbEepromReadyCallback = cbFunc;}
         void detach() {cbEepromReadyCallback = nullptr;}
-        void handle() {if(cbEepromReadyCallback) cbEepromReadyCallback();}
+    private:
+        static void __attribute__((flatten, signal(EE_READY_vect_num))) irqHandler(){
+            if(cbEepromReadyCallback) cbEepromReadyCallback();
+        }
     }static EepromReadyInterrupt;
     static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::MasterWrite>MasterWrite;
     static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::Write>Write;
@@ -83,6 +100,7 @@ public:
         /* Start eeprom write by setting EEMPE and EEPE*/
         Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEMPE);
         Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEPE);
+
     }
     static bool write(uint16_t addr, uint16_t val){}
     static bool write(uint16_t addr, uint32_t val){}
@@ -137,8 +155,5 @@ public:
 };
 
 }// namespace mcu
-
-/* Eeprom Ready Interrupt*/
-ISR(EE_READY_vect){mcu::Eeprom::EepromReadyInterrupt.handle();}
 
 #endif //EEPROM_HPP

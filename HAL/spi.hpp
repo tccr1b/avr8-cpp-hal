@@ -94,7 +94,10 @@ private:
         void disable(){Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_SPIE);}
         SpiInterrupt& attach(Callback cbFunc){cbTransferCompletedCallback = cbFunc; return *this;}
         SpiInterrupt& detach() {cbTransferCompletedCallback = nullptr; return *this;}
-        void handle() {if(cbTransferCompletedCallback) cbTransferCompletedCallback();}
+    private:
+        static void __attribute__((flatten, signal(SPI_STC_vect_num))) irqHandler(){
+            if(cbTransferCompletedCallback) cbTransferCompletedCallback();
+        }
     };
 public:
     typedef struct {
@@ -234,8 +237,5 @@ public:
 };
 } // namespace Peripherals
 } // namespace mcu
-
-/* SPI Transfer Complete interrupt*/
-ISR(SPI_STC_vect){mcu::Peripherals::Spi::TransferCompletedInterrupt.handle();}
 
 #endif //SPI_HPP
