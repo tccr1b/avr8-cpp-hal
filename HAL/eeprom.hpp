@@ -41,20 +41,6 @@ private:
         void disable(){regAddr().clearBitmask(static_cast<uint8_t>(feat));}
         [[nodiscard]] bool isEnabled(){return regAddr().readBit(static_cast<uint8_t>(feat));}
     };
-    template<typename T>
-    static bool write(uint16_t address, T value){
-        while(Eeprom::isBusy());
-        
-        {AtomicBlock ab;
-            Regs::Eeprom::EepromAddressReg_HByte.setValue((uint8_t)(address >> 8));
-            Regs::Eeprom::EepromAddressReg_LByte.setValue((uint8_t)(address));
-
-            Regs::Eeprom::EepromDataReg.setValue(T);
-
-            Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEMPE);
-            Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEPE);
-        }
-    }
 
 public:
     typedef struct {
@@ -73,8 +59,8 @@ public:
         }
     }static EepromReadyInterrupt;
     static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::MasterWrite>MasterWrite;
-    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::Write>Write;
-    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::Read>Read;
+    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::Write>      Write;
+    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::Read>       Read;
     static void setEepromMode(EepromMode mode){
         Regs::Eeprom::EepromControlReg.writeMasked(static_cast<uint8_t>(mode), ~bitmask_eecr_mode_sel_bits);
     }
@@ -82,66 +68,27 @@ public:
         return static_cast<EepromMode>(Regs::Eeprom::EepromControlReg.getValue(bitmask_eecr_mode_sel_bits));
     }
 
-    /* Overloaded write functions*/
-    static bool write(uint16_t addr, uint8_t val){
-        /* Disable interrupt*/
-        AtomicBlock ab;
-        
-        /* Wait for completion of previous write*/
+    static bool writeByte(uint16_t uiAddress, uint8_t data){
         while(Eeprom::isBusy());
         
-        /* Set up address reg*/
-        Regs::Eeprom::EepromAddressReg_HByte.setValue((uint8_t)(addr >> 8));
-        Regs::Eeprom::EepromAddressReg_LByte.setValue((uint8_t)(addr));
+        {AtomicBlock ab;
+            Regs::Eeprom::EepromAddressReg_HByte.setValue((uint8_t)(uiAddress >> 8));
+            Regs::Eeprom::EepromAddressReg_LByte.setValue((uint8_t)uiAddress);
+            Regs::Eeprom::EepromDataReg.setValue(data);
 
-        /* Set up data reg*/
-        Regs::Eeprom::EepromDataReg.setValue(val);
-
-        /* Start eeprom write by setting EEMPE and EEPE*/
-        Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEMPE);
-        Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEPE);
-
-    }
-    static bool write(uint16_t addr, uint16_t val){}
-    static bool write(uint16_t addr, uint32_t val){}
-    static bool write(uint16_t addr, uint64_t val){}
-
-    /* Overloaded read functions*/
-    static uint8_t read(){
-
+            /* Write logical one to EEMPE */
+            Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEMPE);
+            /* Start eeprom write by setting EEPE */
+            Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEPE);
+        }
     }
 
-    /* Overloaded update functions*/
-    static void update(){
-
-    }
-
-    static bool writeBlock(){}
-    static bool readBlock(){}
-    static bool updateBlock(){}
-
-    static void writeByte(uint16_t address, uint8_t data){
+    static uint8_t readByte(uint16_t uiAddress){
         /* Wait for completion of previous write */
-        while(Regs::Eeprom::EepromControlReg.readBit(RegBits::Eeprom::EECR_EEPE));
-        
-        /* Set up address and data registers */
-        Regs::Eeprom::EepromAddressReg_HByte.setValue((address >> 8) & 0xFF);
-        Regs::Eeprom::EepromAddressReg_LByte.setValue(address & 0xFF);
-        Regs::Eeprom::EepromDataReg.setValue(data);
-        
-        /* Write logical one to EEMPE */
-        Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEMPE);
-        /* Start eeprom write by setting EEPE */
-        Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEPE);
-        
-    }
-    static uint8_t readByte(uint16_t address){
-        /* Wait for completion of previous write */
-        while(Regs::Eeprom::EepromControlReg.readBit(RegBits::Eeprom::EECR_EEPE));
-        
+        while(Eeprom::isBusy());
         /* Set up address register */
-        Regs::Eeprom::EepromAddressReg_HByte.setValue((address >> 8) & 0xFF);
-        Regs::Eeprom::EepromAddressReg_LByte.setValue(address & 0xFF);
+        Regs::Eeprom::EepromAddressReg_HByte.setValue((uint8_t)(uiAddress >> 8));
+        Regs::Eeprom::EepromAddressReg_LByte.setValue((uint8_t)uiAddress);
         
         /* Start eeprom read by writing EERE */
         Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERE);
@@ -149,6 +96,34 @@ public:
         /* Return data from Data Register */
         return Regs::Eeprom::EepromDataReg.getValue();
     }
+
+    template<typename T> static bool write(uint16_t uiAddress, const T& data){
+        const uint8_t* pData = reinterpret_cast<const uint8_t**>(&data);
+        for(size_t i = 0; i < sizeof(T); ++i){writeByte(uiAddress+1, pData[i]);}
+        return true;
+    }
+
+    template<typename T> static void read(uint16_t uiAddress, T& data){
+        uint8_t* pData = reinterpret_cast<uint8_t*>(&data);
+        for (size_t i = 0; i < sizeof(T); ++i){pData[i] = readByte(uiAddress+1);}
+    }
+    
+    template<typename T> static T read(uint16_t uiRomAddress){
+        /* temporary variable on RAM*/
+        T tRomData;
+        read(uiRomAddress, tRomData);
+        return tRomData;
+    }
+
+    static void updateByte(uint16_t uiAddress, uint8_t data_byte){
+        if(readByte(uiAddress) != data_byte){writeByte(uiAddress, data_byte);}
+    }
+
+    template<typename T> static void update(uint16_t uiAddress, const T& data){
+        const uint8_t* pData = reinterpret_cast<const uint8_t*>(&data);
+        for (size_t i=0; i<sizeof(T); ++i){updateByte(uiAddress+1, pData[i]);}
+    }
+
     static void init(config_t* eepromCfg){
     
     }
