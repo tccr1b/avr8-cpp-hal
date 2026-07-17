@@ -47,12 +47,12 @@ using namespace HAL;
 
 class HD44780{
 private:
-    VirtualPort& dataBus;
-    VirtualPort::PinConfig rsPin;
-    VirtualPort::PinConfig enPin;
+//    VirtualPort& dataBus;
+//    VirtualPort::PinConfig rsPin;
+//    VirtualPort::PinConfig enPin;
     void clockPulse();
 public:
-    HD44780(VirtualPort& bus, VirtualPort::PinConfig rs, VirtualPort::PinConfig en);
+ //   HD44780(VirtualPort& bus, VirtualPort::PinConfig rs, VirtualPort::PinConfig en);
     void init();
     void sendCommand();
     void sendData();

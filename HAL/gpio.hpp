@@ -112,8 +112,12 @@ namespace HAL{  /* Template GpioPort & GpioPin*/
         static inline void setLow() {gpioPORT::PortReg().clearBitmask(combinedMask);}
     };
 
-    template<typename T, typename = void> struct is_valid_pin : cstd::false_type {};
-    template<typename T> struct is_valid_pin<T, cstd::void_t<typename T::is_gpio_pin>> : cstd::true_type {};
+    template<typename T, typename = void> 
+    struct is_valid_pin : cstd::false_type {};
+    
+    template<typename T> 
+    struct is_valid_pin<T, cstd::void_t<typename T::is_gpio_pin>> : cstd::true_type {};
+    
     template<typename... Pins>
     struct VirtualPort{
         static_assert((is_valid_pin<Pins>::values && ...), 
@@ -146,7 +150,6 @@ namespace HAL{  /* Template GpioPort & GpioPin*/
 
             return result;
         }
-        
         static inline void setHigh(){}
         static inline void setLow(){}
     };
