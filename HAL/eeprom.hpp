@@ -5,7 +5,8 @@
 #define __AVR_ATmega328P__
 
 #include <avr/interrupt.h>
-#include <avr/eeprom.h>
+#include <stddef.h>
+#include <avr/crc16.h>
 
 #include "HAL/registers.hpp"
 #include "HAL/utils/atomicblock.hpp"
@@ -111,54 +112,204 @@ public:
         if(readByte(uiAddress) != uiData){writeByte(uiAddress, uiData);}
     }
 
-    template<typename T> static void write(uint16_t uiAddress, const T& tData){
+    template<typename T> 
+    static void write(uint16_t uiAddress, const T& tData){
         const uint8_t* ptrData = reinterpret_cast<const uint8_t**>(&tData);
-        for(size_t i = 0; i < sizeof(T); ++i){writeByte(uiAddress+1, ptrData[i]);}
+        for(size_t i = 0; i < sizeof(T); ++i){writeByte(uiAddress+i, ptrData[i]);}
     }
 
-    template<typename T> static void read(uint16_t uiAddress, T& tData){
+    template<typename T> 
+    static void read(uint16_t uiAddress, T& tData){
         uint8_t* ptrData = reinterpret_cast<uint8_t*>(&tData);
-        for (size_t i=0; i<sizeof(T); ++i){ptrData[i] = readByte(uiAddress+1);}
+        for (size_t i=0; i<sizeof(T); ++i){ptrData[i] = readByte(uiAddress+i);}
     }
     
-    template<typename T> static T    read(uint16_t uiRomAddress){
+    template<typename T> 
+    static T    read(uint16_t uiRomAddress){
         /* temporary variable on RAM*/
         T tRomData;
         read(uiRomAddress, tRomData);
         return tRomData;
     }
     
-    template<typename T> static void update(uint16_t uiAddress, const T& tData){
+    template<typename T> 
+    static void update(uint16_t uiAddress, const T& tData){
         const uint8_t* ptrData = reinterpret_cast<const uint8_t*>(&tData);
-        for (size_t i=0; i<sizeof(T); ++i){updateByte(uiAddress+1, ptrData[i]);}
+        for (size_t i=0; i<sizeof(T); ++i){updateByte(uiAddress+i, ptrData[i]);}
     }
 
     static void init(config_t* eepromCfg){
         setEepromMode(eepromCfg->eeprom_mode);
     }
-
-
 };
 
 template<typename T>
+/*
+ * @brief Tekil EEPROM değişkenleri için akıllı sarmalayıcı (Wrapper) sınıf.
+ * 
+ * @details EEPROM'daki bir veriyi, sanki normal bir RAM değişkeniymiş gibi (=) atama operatörü 
+ * ile okuyup yazmanızı sağlar. Arka planda 'update' mantığıyla çalıştığı için, sadece değer 
+ * gerçekten değiştiğinde donanıma yazma işlemi yapar ve EEPROM (100.000) ömrünü korur.
+ * 
+ * @tparam T EEPROM'da tutulacak verinin tipi (Örn: uint16_t, float, ayar_struct_t)
+ */
 class EepromVariable{
 private:
-    uint16_t m_uiRomAddress;
+    uint16_t m_RomAddress;
 public:
-    constexpr EepromVariable(uint16_t uiRomAddress) : m_uiRomAddress(uiRomAddress){}
+    constexpr EepromVariable(uint16_t uiRomAddress) : m_RomAddress(uiRomAddress){}
     EepromVariable& operator=(const T& tValue){
-        mcu::Eeprom::update(m_uiRomAddress, tValue);
+        mcu::Eeprom::update(m_RomAddress, tValue);
         return *this;
     }
     operator T() const{
-        return mcu::Eeprom::read<T>(m_uiRomAddress);
+        return mcu::Eeprom::read<T>(m_RomAddress);
     }
     T operator+=(const T& tValue){
-        T tCurrent = mcu::Eeprom::read<T>(m_uiRomAddress);
+        T tCurrent = mcu::Eeprom::read<T>(m_RomAddress);
         tCurrent += tValue;
-        mcu::Eeprom::update(m_uiRomAddress, tCurrent);
+        mcu::Eeprom::update(m_RomAddress, tCurrent);
         return tCurrent;
     }
+};
+
+/**
+ * @brief EEPROM üzerindeki dizileri ve metinleri (string) yönetmek için sarmalayıcı sınıf.
+ * 
+ * @details RAM dizilerinde olduğu gibi [] indeks operatörü ile doğrudan ilgili EEPROM adresine 
+ * erişim sağlar (Proxy Pattern). Performans gerektiren durumlarda tüm diziyi tek seferde 
+ * okumak/yazmak için readAll() ve updateAll() metotları içerir.
+ * 
+ * @tparam T Dizinin eleman veri tipi (Örn: char, float)
+ * @tparam N Dizinin maksimum eleman sayısı (Derleme zamanı buffer-overflow koruması sağlar)
+ */
+template <typename T, size_t N>
+class EepromArray {
+private:
+    uint16_t m_BaseAddr;
+
+public:
+    // Kurucu: Dizinin başlangıç adresini atar
+    constexpr EepromArray(uint16_t addr) : m_BaseAddr(addr) {}
+
+    // --- VEKİL (PROXY) SINIF ---
+    // operator[] kullanıldığında bellek referansı yerine bu nesne döner.
+    class ElementProxy {
+    private:
+        uint16_t m_ElementAddr;
+
+    public:
+        constexpr ElementProxy(uint16_t addr) : m_ElementAddr(addr) {}
+
+        // Dizi elemanına yazma yapıldığında tetiklenir
+        ElementProxy& operator=(const T& value) {
+            mcu::Eeprom::update(m_ElementAddr, value);
+            return *this;
+        }
+
+        // Dizi elemanı okunduğunda tetiklenir
+        operator T() const {
+            return mcu::Eeprom::read<T>(m_ElementAddr);
+        }
+        
+        T operator+=(const T& value) {
+            T current = mcu::Eeprom::read<T>(m_ElementAddr);
+            current += value;
+            mcu::Eeprom::update(m_ElementAddr, current);
+            return current;
+        }
+    };
+
+    // --- DİZİ OPERATÖRLERİ VE METOTLARI ---
+
+    // 1. İNDEKS OPERATÖRÜ (Örn: dizi[2])
+    // İstenen indeksin EEPROM'daki fiziksel adresini hesaplar ve vekil sınıf döndürür
+    ElementProxy operator[](size_t index) {
+        uint16_t target_address = m_BaseAddr + (index * sizeof(T));
+        return ElementProxy(target_address);
+    }
+
+    // 2. KAPASİTE BİLGİSİ
+    constexpr size_t size() const {
+        return N;
+    }
+
+    // 3. BLOK OKUMA (Yüksek Performans)
+    // Tüm diziyi tek donanım bloğunda güvenli boyuttaki RAM dizisine aktarır
+    void readAll(T (&ram_buffer)[N]) const {
+        mcu::Eeprom::read(m_BaseAddr, ram_buffer);
+    }
+
+    // 4. BLOK YAZMA (Yüksek Performans)
+    // RAM'deki bir diziyi tek hamlede EEPROM'a günceller (Sadece değişenleri yazar)
+    void updateAll(const T (&ram_buffer)[N]) {
+        mcu::Eeprom::update(m_BaseAddr, ram_buffer);
+    }
+}; //
+
+template<typename T>
+struct EepromDataBlock{
+    private:
+        uint16_t m_BaseAddress;
+    public:
+        T tRamData;
+        constexpr EepromDataBlock(uint16_t addr) : m_BaseAddress(addr){}
+        void load(){mcu::Eeprom::read (m_BaseAddress, tRamData);}
+        void save(){mcu::Eeprom::write(m_BaseAddress, tRamData);}
+}__attribute__((packed));
+
+/**
+ * @brief EEPROM bellek haritası (Blueprint). Fiziksel olarak RAM'de yer kaplamaz.
+ * 
+ * @details Bu yapı, projedeki EEPROM değişkenlerinin adreslerini derleme zamanında otomatik 
+ * olarak hesaplamak (offsetof makrosu ile) ve adres çakışmalarını sıfıra indirmek için tasarlanmıştır.
+ * 
+ * @warning Derleyicinin bellek hizalaması (padding) yaparak adresleri kaydırmasını engellemek 
+ * için KESİNLİKLE sonuna __attribute__((packed)) eklenmelidir.
+ */
+struct EepromMap{
+    EepromDataBlock<uint8_t> eeDataBlock;
+    uint16_t eeCrc;
+} __attribute__((packed));
+
+/**
+ * @brief Elektrik kesintilerine karşı CRC korumalı güvenli EEPROM veri bloğu.
+ * 
+ * @details Tüm ayarları (struct) RAM'de geçici olarak tutar ve tek seferde hesaplanan CRC16 
+ * (Checksum) ile birlikte EEPROM'a yazar. Cihaz açılışında EEPROM verisinin yarıda kesilip 
+ * kesilmediğini (corrupt) denetler ve sistemi çökmekten kurtarır.
+ * 
+ * @tparam T Korunacak verilerin bulunduğu ve paketlenmiş (packed) Struct veri tipi
+ */
+template<typename T>
+struct EepromSecureDataBlock{
+    private:
+        uint16_t m_DataAddr;
+        uint16_t m_CrcAddr;
+
+        uint16_t calculateCRC() const{
+            uint16_t crc = 0xFFFF;
+            const uint8_t* ptrRamData = reinterpret_cast<const uint8_t*>(&ramData);
+            for(size_t i = 0; i < sizeof(T); ++i){
+                crc = _crc16_update(crc, ptr[i]);
+            }
+            return crc;
+        }
+    public:
+        T ramData;
+        constexpr EepromSecureBlock(uint16_t data_addr, uint16_t crc_addr) : m_DataAddr(data_addr), m_CrcAddr(crc_addr){}
+        bool loadAndVerify(){
+            mcu::Eeprom::read(m_DataAddr, ramData);
+            uint16_t stored_crc = mcu::Eeprom::read<uint16_t>(m_CrcAddr);
+
+            return (calculateCRC() == stored_crc) ? true : false;
+        }
+
+        void save(){
+            mcu::Eeprom::update(m_DataAddr, ramData);
+            uint16_t new_crc = calculateCRC();
+            mcu::Eeprom::update(m_CrcAddr, new_crc);
+        }
 };
 
 }// namespace mcu
