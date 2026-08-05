@@ -45,40 +45,6 @@ private:
     [[gnu::always_inline, flatten]] static inline bool isBusy(){
         return Regs::Eeprom::EepromControlReg.readBit(RegBits::Eeprom::EECR_EEPE);
     }
-    template<typename regAddr, EepromFeature feat> struct Feature{
-        void enable() {regAddr().setBitmask(static_cast<uint8_t>(feat));}
-        void disable(){regAddr().clearBitmask(static_cast<uint8_t>(feat));}
-        [[nodiscard]] bool isEnabled(){return regAddr().readBit(static_cast<uint8_t>(feat));}
-    };
-
-public:
-    typedef struct {
-        EepromMode eeprom_mode;
-        EepromFeature feat;
-    } config_t;
-
-    struct{ //Interrupt
-        void enable() {Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERIE);}
-        void disable(){Regs::Eeprom::EepromControlReg.clearBitmask(RegBits::Eeprom::EECR_EERIE);}
-        void attach(Callback cbFunc){cbEepromReadyCallback = cbFunc;}
-        void detach() {cbEepromReadyCallback = nullptr;}
-    private:
-        static void __attribute__((flatten, signal(EE_READY_vect_num))) irqHandler(){
-            if(cbEepromReadyCallback) cbEepromReadyCallback();
-        }
-    }static EepromReadyInterrupt;
-    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::MasterWrite>MasterWrite;
-    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::Write>      Write;
-    static Eeprom::Feature<decltype(Regs::Eeprom::EepromControlReg), EepromFeature::Read>       Read;
-
-    static EepromMode getEepromMode(){
-        return static_cast<EepromMode>(Regs::Eeprom::EepromControlReg.getValue(bitmask_eecr_mode_sel_bits));
-    }
-
-    static void     setEepromMode(EepromMode mode){
-        Regs::Eeprom::EepromControlReg.writeMasked(static_cast<uint8_t>(mode), ~bitmask_eecr_mode_sel_bits);
-    }
-
     static bool     writeByte(uint16_t uiAddress, uint8_t data){
         while(Eeprom::isBusy());
         
@@ -93,23 +59,41 @@ public:
             Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EEPE);
         }
     }
-
     static uint8_t  readByte(uint16_t uiAddress){
         /* Wait for completion of previous write */
         while(Eeprom::isBusy());
         /* Set up address register */
-        Regs::Eeprom::EepromAddressReg_HByte.setValue((uint8_t)(uiAddress >> 8));
-        Regs::Eeprom::EepromAddressReg_LByte.setValue((uint8_t)uiAddress);
-        
-        /* Start eeprom read by writing EERE */
-        Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERE);
-        
+        {AtomicBlock ab;
+            Regs::Eeprom::EepromAddressReg_HByte.setValue((uint8_t)(uiAddress >> 8));
+            Regs::Eeprom::EepromAddressReg_LByte.setValue((uint8_t)uiAddress);
+            /* Start eeprom read by writing EERE */
+            Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERE);
+        }
         /* Return data from Data Register */
         return Regs::Eeprom::EepromDataReg.getValue();
     }
-
     static void     updateByte(uint16_t uiAddress, uint8_t uiData){
         if(readByte(uiAddress) != uiData){writeByte(uiAddress, uiData);}
+    }
+
+    public:
+    struct{ //Interrupt
+            void enable() {Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERIE);}
+            void disable(){Regs::Eeprom::EepromControlReg.clearBitmask(RegBits::Eeprom::EECR_EERIE);}
+            void attach(Callback cbFunc){cbEepromReadyCallback = cbFunc;}
+            void detach() {cbEepromReadyCallback = nullptr;}
+        private:
+            static void __attribute__((flatten, signal(EE_READY_vect_num))) irqHandler(){
+                if(cbEepromReadyCallback) cbEepromReadyCallback();
+            }
+    }static EepromReadyInterrupt;
+
+    static EepromMode getEepromMode(){
+        return static_cast<EepromMode>(Regs::Eeprom::EepromControlReg.getValue(bitmask_eecr_mode_sel_bits));
+    }
+
+    static void     setEepromMode(EepromMode mode){
+        Regs::Eeprom::EepromControlReg.writeMasked(static_cast<uint8_t>(mode), ~bitmask_eecr_mode_sel_bits);
     }
 
     template<typename T> 
@@ -138,12 +122,9 @@ public:
         for (size_t i=0; i<sizeof(T); ++i){updateByte(uiAddress+i, ptrData[i]);}
     }
 
-    static void init(config_t* eepromCfg){
-        setEepromMode(eepromCfg->eeprom_mode);
-    }
 };
 
-template<typename T>
+
 /*
  * @brief Tekil EEPROM değişkenleri için akıllı sarmalayıcı (Wrapper) sınıf.
  * 
@@ -153,7 +134,7 @@ template<typename T>
  * 
  * @tparam T EEPROM'da tutulacak verinin tipi (Örn: uint16_t, float, ayar_struct_t)
  */
-class EepromVariable{
+template<typename T> class EepromVariable{
 private:
     uint16_t m_RomAddress;
 public:
@@ -183,8 +164,7 @@ public:
  * @tparam T Dizinin eleman veri tipi (Örn: char, float)
  * @tparam N Dizinin maksimum eleman sayısı (Derleme zamanı buffer-overflow koruması sağlar)
  */
-template <typename T, size_t N>
-class EepromArray {
+template<typename T, size_t N> class EepromArray {
 private:
     uint16_t m_BaseAddr;
 
@@ -247,8 +227,7 @@ public:
     }
 }; //
 
-template<typename T>
-struct EepromDataBlock{
+template<typename T> struct EepromDataBlock{
     private:
         uint16_t m_BaseAddress;
     public:
@@ -281,35 +260,33 @@ struct EepromMap{
  * 
  * @tparam T Korunacak verilerin bulunduğu ve paketlenmiş (packed) Struct veri tipi
  */
-template<typename T>
-struct EepromSecureDataBlock{
-    private:
-        uint16_t m_DataAddr;
-        uint16_t m_CrcAddr;
+template<typename T> struct EepromSecureDataBlock{
+private:
+    uint16_t m_DataAddr;
+    uint16_t m_CrcAddr;
 
-        uint16_t calculateCRC() const{
-            uint16_t crc = 0xFFFF;
-            const uint8_t* ptrRamData = reinterpret_cast<const uint8_t*>(&ramData);
-            for(size_t i = 0; i < sizeof(T); ++i){
-                crc = _crc16_update(crc, ptr[i]);
-            }
-            return crc;
+    uint16_t calculateCRC() const{
+        uint16_t crc = 0xFFFF;
+        const uint8_t* ptrRamData = reinterpret_cast<const uint8_t*>(&ramData);
+        for(size_t i = 0; i < sizeof(T); ++i){
+            crc = _crc16_update(crc, ptrRamData[i]);
         }
-    public:
-        T ramData;
-        constexpr EepromSecureBlock(uint16_t data_addr, uint16_t crc_addr) : m_DataAddr(data_addr), m_CrcAddr(crc_addr){}
-        bool loadAndVerify(){
-            mcu::Eeprom::read(m_DataAddr, ramData);
-            uint16_t stored_crc = mcu::Eeprom::read<uint16_t>(m_CrcAddr);
+        return crc;
+    }
+public:
+    T ramData;
+    constexpr EepromSecureBlock(uint16_t data_addr, uint16_t crc_addr) : m_DataAddr(data_addr), m_CrcAddr(crc_addr){}
+    bool loadAndVerify(){
+        mcu::Eeprom::read(m_DataAddr, ramData);
+        uint16_t stored_crc = mcu::Eeprom::read<uint16_t>(m_CrcAddr);
+        return (calculateCRC() == stored_crc) ? true : false;
+    }
 
-            return (calculateCRC() == stored_crc) ? true : false;
-        }
-
-        void save(){
-            mcu::Eeprom::update(m_DataAddr, ramData);
-            uint16_t new_crc = calculateCRC();
-            mcu::Eeprom::update(m_CrcAddr, new_crc);
-        }
+    void save(){
+        mcu::Eeprom::update(m_DataAddr, ramData);
+        uint16_t new_crc = calculateCRC();
+        mcu::Eeprom::update(m_CrcAddr, new_crc);
+    }
 };
 
 }// namespace mcu
