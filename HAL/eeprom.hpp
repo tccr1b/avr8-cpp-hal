@@ -1,8 +1,10 @@
+
 #ifndef EEPROM_HPP
 #define EEPROM_HPP
 
-// Sonra sil
-#define __AVR_ATmega328P__
+#ifndef __AVR_ATmega328P__
+    #define __AVR_ATmega328P__
+#endif
 
 #include <avr/interrupt.h>
 #include <stddef.h>
@@ -10,7 +12,6 @@
 
 #include "HAL/registers.hpp"
 #include "HAL/utils/atomicblock.hpp"
-#include "HAL/macros.hpp"
 
 using namespace mcu;
 
@@ -37,6 +38,7 @@ enum class EepromFeature : uint8_t{
 };
 
 namespace mcu{
+namespace Peripherals{
 class Eeprom{
 private:
     constexpr static uint8_t bitmask_eecr_mode_sel_bits = RegBits::Eeprom::EECR_EEPM0 | RegBits::Eeprom::EECR_EEPM1;
@@ -46,6 +48,7 @@ private:
         return Regs::Eeprom::EepromControlReg.readBit(RegBits::Eeprom::EECR_EEPE);
     }
     static bool     writeByte(uint16_t uiAddress, uint8_t data){
+        
         while(Eeprom::isBusy());
         
         {AtomicBlock ab;
@@ -76,8 +79,9 @@ private:
         if(readByte(uiAddress) != uiData){writeByte(uiAddress, uiData);}
     }
 
-    public:
+public:
     struct{ //Interrupt
+        public:
             void enable() {Regs::Eeprom::EepromControlReg.setBitmask(RegBits::Eeprom::EECR_EERIE);}
             void disable(){Regs::Eeprom::EepromControlReg.clearBitmask(RegBits::Eeprom::EECR_EERIE);}
             void attach(Callback cbFunc){cbEepromReadyCallback = cbFunc;}
@@ -92,34 +96,34 @@ private:
         return static_cast<EepromMode>(Regs::Eeprom::EepromControlReg.getValue(bitmask_eecr_mode_sel_bits));
     }
 
-    static void     setEepromMode(EepromMode mode){
-        Regs::Eeprom::EepromControlReg.writeMasked(static_cast<uint8_t>(mode), ~bitmask_eecr_mode_sel_bits);
+    static void setEepromMode(EepromMode mode){
+        Regs::Eeprom::EepromControlReg.writeMasked(static_cast<uint8_t>(mode), bitmask_eecr_mode_sel_bits);
     }
 
     template<typename T> 
-    static void write(uint16_t uiAddress, const T& tData){
+    static void write(uint16_t romAddress, const T& tData){
         const uint8_t* ptrData = reinterpret_cast<const uint8_t**>(&tData);
-        for(size_t i = 0; i < sizeof(T); ++i){writeByte(uiAddress+i, ptrData[i]);}
+        for(size_t i = 0; i < sizeof(T); ++i){writeByte(romAddress+i, ptrData[i]);}
     }
 
     template<typename T> 
-    static void read(uint16_t uiAddress, T& tData){
+    static void read(uint16_t romAddress, T& tData){
         uint8_t* ptrData = reinterpret_cast<uint8_t*>(&tData);
-        for (size_t i=0; i<sizeof(T); ++i){ptrData[i] = readByte(uiAddress+i);}
+        for (size_t i=0; i<sizeof(T); ++i){ptrData[i] = readByte(romAddress+i);}
     }
     
     template<typename T> 
-    static T    read(uint16_t uiRomAddress){
+    static T    read(uint16_t romAddress){
         /* temporary variable on RAM*/
         T tRomData;
-        read(uiRomAddress, tRomData);
+        read(romAddress, tRomData);
         return tRomData;
     }
     
     template<typename T> 
-    static void update(uint16_t uiAddress, const T& tData){
+    static void update(uint16_t romAddress, const T& tData){
         const uint8_t* ptrData = reinterpret_cast<const uint8_t*>(&tData);
-        for (size_t i=0; i<sizeof(T); ++i){updateByte(uiAddress+i, ptrData[i]);}
+        for (size_t i=0; i<sizeof(T); ++i){updateByte(romAddress+i, ptrData[i]);}
     }
 
 };
@@ -134,7 +138,8 @@ private:
  * 
  * @tparam T EEPROM'da tutulacak verinin tipi (Örn: uint16_t, float, ayar_struct_t)
  */
-template<typename T> class EepromVariable{
+template<typename T>
+class EepromVariable{
 private:
     uint16_t m_RomAddress;
 public:
@@ -164,7 +169,8 @@ public:
  * @tparam T Dizinin eleman veri tipi (Örn: char, float)
  * @tparam N Dizinin maksimum eleman sayısı (Derleme zamanı buffer-overflow koruması sağlar)
  */
-template<typename T, size_t N> class EepromArray {
+template<typename T, size_t N>
+class EepromArray {
 private:
     uint16_t m_BaseAddr;
 
@@ -225,9 +231,10 @@ public:
     void updateAll(const T (&ram_buffer)[N]) {
         mcu::Eeprom::update(m_BaseAddr, ram_buffer);
     }
-}; //
+};
 
-template<typename T> struct EepromDataBlock{
+template<typename T>
+struct EepromDataBlock{
     private:
         uint16_t m_BaseAddress;
     public:
@@ -238,20 +245,6 @@ template<typename T> struct EepromDataBlock{
 }__attribute__((packed));
 
 /**
- * @brief EEPROM bellek haritası (Blueprint). Fiziksel olarak RAM'de yer kaplamaz.
- * 
- * @details Bu yapı, projedeki EEPROM değişkenlerinin adreslerini derleme zamanında otomatik 
- * olarak hesaplamak (offsetof makrosu ile) ve adres çakışmalarını sıfıra indirmek için tasarlanmıştır.
- * 
- * @warning Derleyicinin bellek hizalaması (padding) yaparak adresleri kaydırmasını engellemek 
- * için KESİNLİKLE sonuna __attribute__((packed)) eklenmelidir.
- */
-struct EepromMap{
-    EepromDataBlock<uint8_t> eeDataBlock;
-    uint16_t eeCrc;
-} __attribute__((packed));
-
-/**
  * @brief Elektrik kesintilerine karşı CRC korumalı güvenli EEPROM veri bloğu.
  * 
  * @details Tüm ayarları (struct) RAM'de geçici olarak tutar ve tek seferde hesaplanan CRC16 
@@ -260,7 +253,8 @@ struct EepromMap{
  * 
  * @tparam T Korunacak verilerin bulunduğu ve paketlenmiş (packed) Struct veri tipi
  */
-template<typename T> struct EepromSecureDataBlock{
+template<typename T>
+struct EepromSecureDataBlock{
 private:
     uint16_t m_DataAddr;
     uint16_t m_CrcAddr;
@@ -275,7 +269,7 @@ private:
     }
 public:
     T ramData;
-    constexpr EepromSecureBlock(uint16_t data_addr, uint16_t crc_addr) : m_DataAddr(data_addr), m_CrcAddr(crc_addr){}
+    constexpr EepromSecureDataBlock(uint16_t data_addr, uint16_t crc_addr) : m_DataAddr(data_addr), m_CrcAddr(crc_addr){}
     bool loadAndVerify(){
         mcu::Eeprom::read(m_DataAddr, ramData);
         uint16_t stored_crc = mcu::Eeprom::read<uint16_t>(m_CrcAddr);
@@ -289,11 +283,26 @@ public:
     }
 };
 
+/**
+ * ==============================================================================
+ * KULLANIM REHBERI: EEPROM BELLEK HARITASI (EEPROM MEMORY MAP)
+ * ==============================================================================
+ * EEPROM adreslerini (0x00, 0x05 gibi) elle girmek adres çakışmalarına yol açar.
+ * Bu kütüphaneyi kullanırken, projenizin (main.cpp veya config.hpp) bir yerinde 
+ * aşağıdaki gibi sanal bir struct (Harita) oluşturmanız şiddetle tavsiye edilir.
+ * 
+ * ÖRNEK KULLANIM:
+ * 
+ * struct AppEepromMap {
+ *     uint32_t bootCounter;       // offset: 0x00
+ *     float    calibrationData;   // offset: 0x04
+ *     uint16_t crcCheck;          // offset: 0x08
+ * } __attribute__((packed));      // <- Padding'i kapatmak ZORUNLUDUR!
+ * 
+ * EepromVariable<uint32_t> eepBootCount( offsetof(AppEepromMap, bootCounter) );
+ * ==============================================================================
+ */
+}// namespace Peripherals
 }// namespace mcu
 
 #endif //EEPROM_HPP
-
-void foo(){
-    EepromVariable<uint16_t> evMax(0x20);
-    evMax = 12;
-}

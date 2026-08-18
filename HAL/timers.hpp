@@ -132,7 +132,7 @@ namespace Timers{
                 inline void disable(){IOPin::setPinMode(PinMode::HighImpedance);}
                 OCPin& setOutputMode(OutputMode out_mode){
                     uint8_t mode = static_cast<uint8_t>(out_mode);
-                    uint8_t mask = ~(0x03 << comBitPos);
+                    uint8_t mask = (0x03 << comBitPos);
                     mode <<= comBitPos;
                     mcu::Regs::Timers::Timer0::TimerCounterControlRegA.writeMasked(mode, mask);
                     return *this;
@@ -202,23 +202,22 @@ namespace Timers{
             mcu::Regs::Timers::Timer0::TimerCounterReg = 0x00;
         }
         static void setMode(Mode timerMode){
-            constexpr uint8_t bitmask_tccra_mode_bits = ~(RegBits::Timers::Timer0::TCCR0A_WGM00|
-                                                          RegBits::Timers::Timer0::TCCR0A_WGM01);
-            constexpr uint8_t bitmask_tccrb_mode_bits = ~RegBits::Timers::Timer0::TCCR0B_WGM02;
-            
+            constexpr uint8_t bitmask_tccra_mode_bits = RegBits::Timers::Timer0::TCCR0A_WGM00|
+                                                        RegBits::Timers::Timer0::TCCR0A_WGM01;
+            constexpr uint8_t bitmask_tccrb_mode_bits = RegBits::Timers::Timer0::TCCR0B_WGM02;
             
             Regs::Timers::Timer0::TimerCounterControlRegA.writeMasked(static_cast<uint8_t>(timerMode), bitmask_tccra_mode_bits);
             Regs::Timers::Timer0::TimerCounterControlRegB.writeMasked(static_cast<uint8_t>(timerMode), bitmask_tccrb_mode_bits);
 
         }
         static void setClockPrescaler(Clock tmrClock){
-            constexpr uint8_t bitmask_tccrb_cs_bits = ~(RegBits::Timers::Timer0::TCCR0B_CS00| 
-                                                        RegBits::Timers::Timer0::TCCR0B_CS01| 
-                                                        RegBits::Timers::Timer0::TCCR0B_CS02);
+            constexpr uint8_t bitmask_tccrb_cs_bits = RegBits::Timers::Timer0::TCCR0B_CS00| 
+                                                      RegBits::Timers::Timer0::TCCR0B_CS01| 
+                                                      RegBits::Timers::Timer0::TCCR0B_CS02;
             /*Save current tccrb*/
             uint8_t currentTCCRB = Regs::Timers::Timer0::TimerCounterControlRegB.getValue();
             /*Set new clock/prescaler settings*/
-            currentTCCRB &= bitmask_tccrb_cs_bits;
+            currentTCCRB &= ~bitmask_tccrb_cs_bits;
             currentTCCRB |= static_cast<uint8_t>(tmrClock);
             /*Update tccrb register*/
             Regs::Timers::Timer0::TimerCounterControlRegB.setValue(currentTCCRB);
@@ -395,7 +394,7 @@ namespace Timers{
             inline void disable(){IOPin::setPinMode(PinMode::HighImpedance);}
             inline OCPin& setOutputMode(OutputMode out_mode){
                 uint8_t mode = static_cast<uint8_t>(out_mode);
-                uint8_t mask = ~(0x03 << comBitPos);
+                uint8_t mask = (0x03 << comBitPos);
                 mode <<= comBitPos;
                 mcu::Regs::Timers::Timer1::TimerCounterControlRegA.writeMasked(mode, mask);
                 return *this;
@@ -462,11 +461,11 @@ namespace Timers{
         }
         static void setMode(Mode mode){
             /* Bitmask for WGM bits in TCCR1A*/
-            constexpr uint8_t bitmask_tccra_wgm_bits = ~(RegBits::Timers::Timer1::TCCR1A_WGM11|
-                                                         RegBits::Timers::Timer1::TCCR1A_WGM10);
+            constexpr uint8_t bitmask_tccra_wgm_bits = (RegBits::Timers::Timer1::TCCR1A_WGM11|
+                                                        RegBits::Timers::Timer1::TCCR1A_WGM10);
             /* Bitmask for WGM bits in TCCR1B*/
-            constexpr uint8_t bitmask_tccrb_wgm_bits = ~(RegBits::Timers::Timer1::TCCR1B_WGM13|
-                                                         RegBits::Timers::Timer1::TCCR1B_WGM12);
+            constexpr uint8_t bitmask_tccrb_wgm_bits = (RegBits::Timers::Timer1::TCCR1B_WGM13|
+                                                        RegBits::Timers::Timer1::TCCR1B_WGM12);
             /* Write WGM bits on TCCR1A*/
             Regs::Timers::Timer1::TimerCounterControlRegA.writeMasked(static_cast<uint8_t>(mode), bitmask_tccra_wgm_bits);
             /* Write WGM bits on TCCR1B*/
@@ -480,9 +479,9 @@ namespace Timers{
             }
         }
         static void setClockPrescaler(Clock clk){
-            constexpr uint8_t bitmask_tccrb_clk_bits = ~(RegBits::Timers::Timer1::TCCR1B_CS10|
-                                                         RegBits::Timers::Timer1::TCCR1B_CS11|
-                                                         RegBits::Timers::Timer1::TCCR1B_CS12);
+            constexpr uint8_t bitmask_tccrb_clk_bits = (RegBits::Timers::Timer1::TCCR1B_CS10|
+                                                        RegBits::Timers::Timer1::TCCR1B_CS11|
+                                                        RegBits::Timers::Timer1::TCCR1B_CS12);
             Regs::Timers::Timer1::TimerCounterControlRegB.writeMasked(static_cast<uint8_t>(clk), bitmask_tccrb_clk_bits);
             currentClock = clk;
         }
@@ -646,14 +645,14 @@ f.Enable interrupts, if needed.
         static ClockSource getClockSource(){
             constexpr static uint8_t bitmask_assr_clksrc_bits =(RegBits::Timers::Timer2::ASSR_EXCLK|
                                                                 RegBits::Timers::Timer2::ASSR_AS2);
-            return static_cast<ClockSource>(Regs::Timers::Timer2::AsynchronousStatusReg & bitmask_assr_clksrc_bits);
+            return static_cast<ClockSource>(Regs::Timers::Timer2::AsynchronousStatusReg.getValue(bitmask_assr_clksrc_bits));
         }
         template<typename IOPin, uint8_t comBitPos, uint8_t focBitPos> struct OCPin{
                 inline void enable (){IOPin::setPinMode(PinMode::Output);}
                 inline void disable(){IOPin::setPinMode(PinMode::HighImpedance);}
                 inline OCPin& setOutputMode(OutputMode out_mode){
                     uint8_t mode = static_cast<uint8_t>(out_mode);
-                    uint8_t mask = ~(0x03 << comBitPos);
+                    uint8_t mask = (0x03 << comBitPos);
                     mode <<= comBitPos;
                     mcu::Regs::Timers::Timer2::TimerCounterControlRegA.writeMasked(mode, mask);
                     return *this;
@@ -724,9 +723,9 @@ f.Enable interrupts, if needed.
             if(currentClock != Clock::Stopped) setClockPrescaler(currentClock);
         }
         static void setClockPrescaler(Clock clk){
-            constexpr uint8_t bitmask_tccrb_clk_bits = ~(RegBits::Timers::Timer2::TCCR2B_CS22|
-                                                         RegBits::Timers::Timer2::TCCR2B_CS21|
-                                                         RegBits::Timers::Timer2::TCCR2B_CS20);
+            constexpr uint8_t bitmask_tccrb_clk_bits = (RegBits::Timers::Timer2::TCCR2B_CS22|
+                                                        RegBits::Timers::Timer2::TCCR2B_CS21|
+                                                        RegBits::Timers::Timer2::TCCR2B_CS20);
             mcu::Regs::Timers::Timer2::TimerCounterControlRegB.writeMasked(static_cast<uint8_t>(clk), bitmask_tccrb_clk_bits);
             if(ClockSource::SystemClock != getClockSource()){
                 while(Regs::Timers::Timer2::AsynchronousStatusReg.readBit(RegBits::Timers::Timer2::ASSR_TCR2BUB));
@@ -734,17 +733,17 @@ f.Enable interrupts, if needed.
             if(clk != Clock::Stopped) currentClock = clk;
         };
         static void selectClockSource(ClockSource clkSrc){
-            constexpr static uint8_t bitmask_assr_clksrc_bits =~(RegBits::Timers::Timer2::ASSR_EXCLK|
+            constexpr static uint8_t bitmask_assr_clksrc_bits =(RegBits::Timers::Timer2::ASSR_EXCLK|
                                                                 RegBits::Timers::Timer2::ASSR_AS2);
             mcu::Regs::Timers::Timer2::AsynchronousStatusReg.writeMasked(static_cast<uint8_t>(clkSrc), bitmask_assr_clksrc_bits);
             
         };
         static void setMode(Timer2::Mode timerMode){
             /* TCCR2A    :|-|-|-|-|-|-|WGM21|WGM20|*/
-            constexpr uint8_t bitmask_tccra_mode_bits = ~(RegBits::Timers::Timer2::TCCR2A_WGM20|
-                                                          RegBits::Timers::Timer2::TCCR2A_WGM21);
+            constexpr uint8_t bitmask_tccra_mode_bits = (RegBits::Timers::Timer2::TCCR2A_WGM20|
+                                                         RegBits::Timers::Timer2::TCCR2A_WGM21);
             /* TCCR2B    :|-|-|-|-|WGM22|-|-|-|*/
-            constexpr uint8_t bitmask_tccrb_mode_bits = ~(RegBits::Timers::Timer2::TCCR2B_WGM22);
+            constexpr uint8_t bitmask_tccrb_mode_bits = (RegBits::Timers::Timer2::TCCR2B_WGM22);
             /* TCCR2(A+B):|-|-|-|-|WGM22|-|WGM21|WGM20|*/
             Regs::Timers::Timer2::TimerCounterControlRegA.writeMasked(static_cast<uint8_t>(timerMode), bitmask_tccra_mode_bits);
             Regs::Timers::Timer2::TimerCounterControlRegB.writeMasked(static_cast<uint8_t>(timerMode), bitmask_tccrb_mode_bits);

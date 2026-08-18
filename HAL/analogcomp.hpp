@@ -58,7 +58,7 @@ namespace Peripherals{
             AcInterrupt& detach(){cbAcCallback = nullptr; return *this;}
 //            inline void  handle(){if(cbAcCallback) cbAcCallback();}
             AcInterrupt& selectMode(AcInterruptMode ac_int_mode){
-                Regs::Adc::AnalogComparatorControlAndStatusReg.writeMasked(static_cast<uint8_t>(ac_int_mode), ~bitmask_acsr_int_mode_bits);
+                Regs::Adc::AnalogComparatorControlAndStatusReg.writeMasked(static_cast<uint8_t>(ac_int_mode), bitmask_acsr_int_mode_bits);
                 return *this;
             }
         private:
@@ -89,7 +89,7 @@ namespace Peripherals{
             /* Enable analog comparator to use multiplexer of adc*/
             Regs::Adc::AdcControlAndStatusRegB.setBitmask(RegBits::Adc::ADCSRB_ACME);
             /* Select channel*/
-            Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(channel), ~bitmask_admux_channel_sel_bits);
+            Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(channel), bitmask_admux_channel_sel_bits);
         }
         static void disable(){
             bool currentIntStatus = AnalogComp::Interrupt.isEnabled();

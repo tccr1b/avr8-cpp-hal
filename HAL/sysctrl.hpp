@@ -1,6 +1,9 @@
 #ifndef SYS_CTRL_HPP
 #define SYS_CTRL_HPP
-#define __AVR_ATmega328P__
+
+#ifndef __AVR_ATmega328P__
+    #define __AVR_ATmega328P__
+#endif
 
 #define BITMASK_SLEEPMODE   0xF1
 
@@ -9,8 +12,6 @@
 #include <inttypes.h>
 
 #include "HAL/registers.hpp"
-//#include "HAL/serialstream.hpp"
-#include "HAL/macros.hpp"
 
 using namespace mcu;
 
@@ -68,9 +69,9 @@ namespace System{
 class Sleep{
     public:
         static void setMode(SleepMode sleepMode){
-            constexpr static uint8_t bitmask_smcr_sleep_bits = ~(RegBits::Core::SMCR_SM2|
-                                                                 RegBits::Core::SMCR_SM1|
-                                                                 RegBits::Core::SMCR_SM0);
+            constexpr static uint8_t bitmask_smcr_sleep_bits = (RegBits::Core::SMCR_SM2|
+                                                                RegBits::Core::SMCR_SM1|
+                                                                RegBits::Core::SMCR_SM0);
             mcu::Regs::Core::SleepModeControlReg.writeMasked(static_cast<uint8_t>(sleepMode), bitmask_smcr_sleep_bits);
         }
         static SleepMode getMode(){
@@ -121,7 +122,7 @@ public:
 
 class Clock{
 public:
-    static void         setClockPrescaler(SysClock prescalerValue){
+    static void         setPrescaler(SysClock prescalerValue){
         /* Save status reg and disable global interrupts*/
         uint8_t sreg = Regs::Core::StatusReg;
         cli();
@@ -132,16 +133,15 @@ public:
         /* Restore status reg */
         Regs::Core::StatusReg.setValue(sreg);
     }
-    static SysClock     getClockPrescaler(){
+    static SysClock     getPrescaler(){
         constexpr uint8_t bitmask_clk_prescaler = RegBits::Core::CLKPR_CLKPS3| 
                                                   RegBits::Core::CLKPR_CLKPS2|
                                                   RegBits::Core::CLKPR_CLKPS1|
                                                   RegBits::Core::CLKPR_CLKPS0;
-        uint8_t currentPrescaler = (uint8_t)(Regs::Core::ClockPrescaleReg) & bitmask_clk_prescaler;                                                  
-        return static_cast<SysClock>(currentPrescaler);
+        return static_cast<SysClock>(mcu::Regs::Core::ClockPrescaleReg.getValue(bitmask_clk_prescaler));
     }
     static uint32_t     getCpuFrequency(){
-        return (F_CPU >> static_cast<uint8_t>(getClockPrescaler()));
+        return (F_CPU >> static_cast<uint8_t>(getPrescaler()));
     }
     static uint8_t      getMasterClockSource(){
         return (0x0F & Fuses::getLowFuseBits());

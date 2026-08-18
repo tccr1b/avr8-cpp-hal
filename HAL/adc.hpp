@@ -1,9 +1,10 @@
 #ifndef ADC_HPP
 #define ADC_HPP
 
-#define __AVR_ATmega328P__
+#ifndef __AVR_ATmega328P__
+    #define __AVR_ATmega328P__
+#endif
 
-#include "HAL/macros.hpp"
 #include "HAL/registers.hpp"
 #include "HAL/sysctrl.hpp"
 #include "HAL/utils/atomicblock.hpp"
@@ -94,7 +95,7 @@ namespace Peripherals{
         };
         struct AutoTrig{
             AutoTrig& selectSource(AdcAutoTriggerSource trigSrc){
-                mcu::Regs::Adc::AdcControlAndStatusRegB.writeMasked(static_cast<uint8_t>(trigSrc), ~bitmask_acsrb_trigger_sel_bits);
+                mcu::Regs::Adc::AdcControlAndStatusRegB.writeMasked(static_cast<uint8_t>(trigSrc), bitmask_acsrb_trigger_sel_bits);
                 return *this;
             }
             AdcAutoTriggerSource getSource(){
@@ -106,13 +107,12 @@ namespace Peripherals{
         };
     public:
         typedef struct{
-            AdcReference adc_reference;
-            AdcChannel   adc_channel;
-            AdcClock     adc_clock;
-            AdcAutoTriggerSource adc_auto_trig_src;
-            AdcResultAdjust adc_result_adjust;
-            /* Enables auto trigerring when true*/
-            bool adc_auto_trig_enable = false;
+            AdcReference         adcReference;
+            AdcChannel           adcChannel;
+            AdcClock             adcClockPrescaler;
+            AdcAutoTriggerSource adcAutoTrigSrc;
+            AdcResultAdjust      adcResultAdjust;           /* ADLAR thing*/
+            bool                 adcAutoTrigEnable = false; /* Enables auto trigerring when true*/
         } config_t;
         struct{ //Interrupt
             void enable(){mcu::Regs::Adc::AdcControlAndStatusRegA.setBitmask(mcu::RegBits::Adc::ADCSRA_ADIE);}
@@ -129,7 +129,7 @@ namespace Peripherals{
         static void selectChannel(AdcChannel ch){
             bool auto_trg_flag = false;
             if(AutoTriggering.isEnabled()){AutoTriggering.disable(); auto_trg_flag = true;}
-            mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ch), ~bitmask_admux_channel_sel_bits);
+            mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ch), bitmask_admux_channel_sel_bits);
             auto_trg_flag ? AutoTriggering.enable() : AutoTriggering.disable();
         }
         static AdcChannel getActiveChannel(){
@@ -137,7 +137,7 @@ namespace Peripherals{
             return static_cast<AdcChannel>(Regs::Adc::AdcMultiplexerSelectionReg.getValue(bitmask_admux_channel_sel_bits));
         }
         static void setAdcClockPrescaler(AdcClock adcPresc){
-            mcu::Regs::Adc::AdcControlAndStatusRegA.writeMasked(static_cast<uint8_t>(adcPresc), ~bitmask_acsra_prescaler_bits);
+            mcu::Regs::Adc::AdcControlAndStatusRegA.writeMasked(static_cast<uint8_t>(adcPresc), bitmask_acsra_prescaler_bits);
         }
         static AdcClock getAdcClockPrescaler(){
             return static_cast<AdcClock>(Regs::Adc::AdcControlAndStatusRegA.getValue(bitmask_acsra_prescaler_bits));
@@ -145,7 +145,7 @@ namespace Peripherals{
         static void selectReference(AdcReference ref){
             bool auto_trg_flag = false;
             if(AutoTriggering.isEnabled()){AutoTriggering.disable(); auto_trg_flag = true;}
-            mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ref), ~bitmask_admux_ref_sel_bits);
+            mcu::Regs::Adc::AdcMultiplexerSelectionReg.writeMasked(static_cast<uint8_t>(ref), bitmask_admux_ref_sel_bits);
             auto_trg_flag ? AutoTriggering.enable() : AutoTriggering.disable();
         }
         static AdcReference getReference(){
@@ -193,12 +193,12 @@ namespace Peripherals{
             selectChannel(chan);
             enableAdc();
         }
-        static void init(config_t* conf){
-            if(conf->adc_auto_trig_enable) AutoTriggering.selectSource(conf->adc_auto_trig_src).enable();
-            selectChannel(conf->adc_channel);
-            selectReference(conf->adc_reference);
-            setAdcClockPrescaler(conf->adc_clock);
-            setResultAdjust(conf->adc_result_adjust);
+        static void init(const config_t* conf){
+            if(conf->adcAutoTrigEnable) AutoTriggering.selectSource(conf->adcAutoTrigSrc).enable();
+            selectChannel(conf->adcChannel);
+            selectReference(conf->adcReference);
+            setAdcClockPrescaler(conf->adcClockPrescaler);
+            setResultAdjust(conf->adcResultAdjust);
             enableAdc();
         }
     };

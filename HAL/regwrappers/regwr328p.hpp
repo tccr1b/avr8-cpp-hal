@@ -107,51 +107,56 @@ MyProject/
 
 #include <avr/io.h>
 #include <stdint.h>
-#include "../macros.hpp"
 
 namespace mcu {
-    // =============================================================
-    // 1. Register Şablonu (Sıfır RAM Tüketimi)
-    // =============================================================
-    // Bu struct içinde hiçbir veri değişkeni yoktur, sadece fonksiyonlar vardır.
-    // Bu yüzden RAM'de yer kaplamaz. Adres, şablon parametresi olarak (Addr)
-    // derleme zamanında verilir.
-
+    /*  
+        +============================================================================+
+        | 1. Register Şablonu (Sıfır RAM Tüketimi)                                   |
+        +============================================================================+
+        | Bu struct içinde hiçbir veri değişkeni yoktur, sadece fonksiyonlar vardır. |
+        | Bu yüzden RAM'de yer kaplamaz. Adres, şablon parametresi olarak (Addr)     |
+        | derleme zamanında verilir.                                                 |
+        +----------------------------------------------------------------------------+
+    */
     template<uintptr_t Addr>
         struct IoRegister{
-            // Okuma Operatörü (uint8_t gibi davranır)
-            operator uint8_t() const volatile __atr_always_inline__ {return *(volatile uint8_t*)Addr;}            
-            void operator=(uint8_t value)  const volatile __atr_always_inline__{*(volatile uint8_t*)Addr =value;}
-            void operator|=(uint8_t value) const volatile __atr_always_inline__{*(volatile uint8_t*)Addr |=value;}
-            void operator&=(uint8_t value) const volatile __atr_always_inline__{*(volatile uint8_t*)Addr &=value;}
-            void operator^=(uint8_t value) const volatile __atr_always_inline__{*(volatile uint8_t*)Addr ^=value;}
+            /* Okuma Operatörü (uint8_t gibi davranır) */
+            [[gnu::always_inline]] inline operator uint8_t() const volatile {return *(volatile uint8_t*)Addr;}            
+            [[gnu::always_inline]] inline void operator=(uint8_t value)  const volatile {*(volatile uint8_t*)Addr =value;}
+            [[gnu::always_inline]] inline void operator|=(uint8_t value) const volatile {*(volatile uint8_t*)Addr |=value;}
+            [[gnu::always_inline]] inline void operator&=(uint8_t value) const volatile {*(volatile uint8_t*)Addr &=value;}
+            [[gnu::always_inline]] inline void operator^=(uint8_t value) const volatile {*(volatile uint8_t*)Addr ^=value;}
             
-            inline void setBitmask   (uint8_t bitMask)  const volatile __atr_always_inline__{
+            [[gnu::always_inline]] inline void setBitmask   (uint8_t bitMask)  const volatile {
                 *this |= bitMask;
             }
-            inline void clearBitmask (uint8_t bitMask)  const volatile __atr_always_inline__{
+            [[gnu::always_inline]] inline void clearBitmask (uint8_t bitMask)  const volatile {
                 *this &= ~bitMask;
             }
-            inline void writeBitmask (uint8_t uByte)    const volatile __atr_always_inline__{
+            [[gnu::always_inline]] inline void writeBitmask (uint8_t uByte)    const volatile {
                 *this &= uByte;
             }
-            inline void writeMasked  (uint8_t uByte, uint8_t mask) const volatile __atr_always_inline__{
-                *this &= mask; 
-                *this |= uByte;
+            [[gnu::always_inline]] inline void writeMasked  (uint8_t uByte, uint8_t mask) const volatile{
+                uint8_t currentRegisterValue = *this;
+                uint8_t newRegisterValue = (currentRegisterValue & ~mask) | (uByte & mask);
+                *this = newRegisterValue;
+                
+                //*this &= mask; //eski fonksiyon içeriğinde kullanılan kod satırları
+                //*this |= uByte;//eski fonksiyon içeriğinde kullanılan kod satırları
             }
-            inline void toggleBitmask(uint8_t bitMask)  const volatile __atr_always_inline__{
+            [[gnu::always_inline]] inline void toggleBitmask(uint8_t bitMask)  const volatile {
                 *this ^= bitMask;
             }
-            inline bool readBit      (uint8_t bitMask)  const volatile __atr_always_inline__{
+            [[gnu::always_inline]] inline bool readBit      (uint8_t bitMask)  const volatile {
                 return (*this & bitMask);
             }
-            inline void setValue     (uint8_t value)    const volatile __atr_always_inline__{
+            [[gnu::always_inline]] inline void setValue     (uint8_t value)    const volatile {
                 *this = value;
             }
-            inline uint8_t getValue  ()                 const volatile __atr_always_inline__{
+            [[gnu::always_inline]] inline uint8_t getValue  ()                 const volatile {
                 return *this;
             }
-            inline uint8_t getValue  (uint8_t mask)     const volatile __atr_always_inline__{
+            [[gnu::always_inline]] inline uint8_t getValue  (uint8_t mask)     const volatile {
                 return (*this & mask);
             }
         };
@@ -2446,10 +2451,29 @@ busy programming.*/
                 constexpr uint8_t PC_6      = (1 << PC6);
             }
         }
-    }
-}
+    } //RegBits
+} //namespace mcu
 
-
+namespace mcu{
+namespace RegBits{
+namespace BitMasks{
+    constexpr static uint8_t acsra_prescaler_bits   = (RegBits::Adc::ADCSRA_ADPS0|
+                                                                RegBits::Adc::ADCSRA_ADPS1|
+                                                                RegBits::Adc::ADCSRA_ADPS2);
+    constexpr static uint8_t acsrb_trigger_sel_bits = (RegBits::Adc::ADCSRB_ADTS0|
+                                                                RegBits::Adc::ADCSRB_ADTS1|
+                                                                RegBits::Adc::ADCSRB_ADTS2);
+    constexpr static uint8_t admux_ref_sel_bits     = (RegBits::Adc::ADMUX_REFS0|RegBits::Adc::ADMUX_REFS1);
+    constexpr static uint8_t admux_channel_sel_bits = (RegBits::Adc::ADMUX_MUX0|
+                                                                RegBits::Adc::ADMUX_MUX1|
+                                                                RegBits::Adc::ADMUX_MUX2|
+                                                                RegBits::Adc::ADMUX_MUX3);
+    constexpr static uint8_t didr_digital_in_buffer = (RegBits::Adc::DIDR0_ADC0D|RegBits::Adc::DIDR0_ADC1D|
+                                                                RegBits::Adc::DIDR0_ADC2D|RegBits::Adc::DIDR0_ADC3D|
+                                                                RegBits::Adc::DIDR0_ADC4D|RegBits::Adc::DIDR0_ADC5D);
+}//namespace BitMasks
+}//namespace RegBits
+}//namespace mcu
 
 
 

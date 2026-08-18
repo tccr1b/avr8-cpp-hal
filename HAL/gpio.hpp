@@ -7,7 +7,6 @@
 
 #include "registers.hpp"
 #include "utils.hpp" // custom std namespace: cstd
-#include "macros.hpp"
 
 using namespace mcu;
 

@@ -223,7 +223,7 @@ public:
                                         Regs::Spi::SpiControlReg.clearBitmask(RegBits::Spi::SPCR_MSTR);
     }
     static void setDataMode(SpiDataMode dataMode){
-        constexpr uint8_t bitmask_spcr_data_mode_bits = ~(RegBits::Spi::SPCR_CPHA | RegBits::Spi::SPCR_CPOL);
+        constexpr uint8_t bitmask_spcr_data_mode_bits = (RegBits::Spi::SPCR_CPHA | RegBits::Spi::SPCR_CPOL);
         Regs::Spi::SpiControlReg.writeMasked(static_cast<uint8_t>(dataMode), bitmask_spcr_data_mode_bits);
     }
 /* interrupt driven?*/

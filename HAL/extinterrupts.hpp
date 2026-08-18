@@ -32,7 +32,7 @@ template<typename regEIC, typename regEIM, typename regEIF, uint8_t flagBitmask,
         ExtInterrupt& selectSensing(ExtInterruptSense int_sense){
             uint8_t sensing = static_cast<uint8_t>(int_sense);
             sensing <<= icsPos;
-            uint8_t mask = ~(0x03 << icsPos);            
+            uint8_t mask = (0x03 << icsPos);            
             regEIC().writeMasked(sensing, mask);
         }
                  void clearFlag(){regEIF().setBitmask(flagBitmask);}

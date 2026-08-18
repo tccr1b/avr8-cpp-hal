@@ -56,12 +56,12 @@ private:
     };
 public:
     typedef struct{
-        TwiMode twi_mode;
-        TwiClock twi_clock;
-        bool general_call_rec_en;
-        bool ack_en;
-        bool start_cond_en;
-        bool stop_cond_en;
+        TwiMode twiMode;
+        TwiClock twiClock;
+        bool generalCallRecEnabled;
+        bool ackEnabled;
+        bool startCondEnabled;
+        bool stopCondEnabled;
     }config_t;
     static Twi::Interrupt TwiInterrupt;
     static Twi::Feature<decltype(Regs::Twi::TwiAddressReg), RegBits::Twi::TWAR_TWGCE> GeneralCallRecognition;
@@ -77,11 +77,11 @@ public:
     static bool isEnabled() __atr_flatten__{return Regs::Twi::TwiControlReg.readBit(RegBits::Twi::TWCR_TWEN);}
     static void init(TwiMode twi_mode){}
     static void init(Twi::config_t* cfg){
-        setTwiClockPrescaler(cfg->twi_clock);
-        if(cfg->ack_en) Acknowledge.enable();
-        if(cfg->general_call_rec_en) GeneralCallRecognition.enable();
-        if(cfg->start_cond_en) StartCondition.enable();
-        if(cfg->stop_cond_en) StopCondition.enable();
+        setTwiClockPrescaler(cfg->twiClock);
+        if(cfg->ackEnabled) Acknowledge.enable();
+        if(cfg->generalCallRecEnabled) GeneralCallRecognition.enable();
+        if(cfg->startCondEnabled) StartCondition.enable();
+        if(cfg->stopCondEnabled) StopCondition.enable();
     }
 };
 

@@ -102,7 +102,8 @@ private:
                 Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_TXC0));
     }
     static void setUsartMode(UsartMode usartMode){
-        constexpr uint8_t bitmask_usart_mode = ~(mcu::RegBits::Uart::UCSR0C_UMSEL00 | mcu::RegBits::Uart::UCSR0C_UMSEL01);
+        constexpr uint8_t bitmask_usart_mode = mcu::RegBits::Uart::UCSR0C_UMSEL00|
+                                               mcu::RegBits::Uart::UCSR0C_UMSEL01;
         Regs::Uart::UartControlAndStatusRegC.writeMasked(static_cast<uint8_t>(usartMode), bitmask_usart_mode);
         /* Disable X2 speed when using one of synchronous operation modes.*/
         if(usartMode != UsartMode::Asynchronous) DoubleSpeed.disable();
@@ -112,8 +113,9 @@ private:
         Regs::Core::PowerReductionReg.clearBitmask(RegBits::Core::PRR_PRUSART0);
     }
     static UsartMode getUsartMode(){
-        constexpr uint8_t bitmask_usart_mode = (mcu::RegBits::Uart::UCSR0C_UMSEL00 | mcu::RegBits::Uart::UCSR0C_UMSEL01);
-        uint8_t newMode = (uint8_t)(Regs::Uart::UartControlAndStatusRegC) & bitmask_usart_mode;
+        constexpr uint8_t bitmask_usart_mode = mcu::RegBits::Uart::UCSR0C_UMSEL00|
+                                               mcu::RegBits::Uart::UCSR0C_UMSEL01;
+        uint8_t newMode = mcu::Regs::Uart::UartControlAndStatusRegC.getValue(bitmask_usart_mode);
 
         return (static_cast<UsartMode>(newMode));
     }
@@ -129,7 +131,8 @@ private:
         void isEnabled(){Regs::Uart::UartControlAndStatusRegA.readBit(RegBits::Uart::UCSR0A_U2X0);}
     }static DoubleSpeed;
     static void setParityMode(UsartParityMode parityMode){
-        constexpr uint8_t bitmask_parity_mode = ~(RegBits::Uart::UCSR0C_UPM00 | RegBits::Uart::UCSR0C_UPM01);
+        constexpr uint8_t bitmask_parity_mode = RegBits::Uart::UCSR0C_UPM00|
+                                                RegBits::Uart::UCSR0C_UPM01;
         Regs::Uart::UartControlAndStatusRegC.writeMasked(static_cast<uint8_t>(parityMode), bitmask_parity_mode);
     }
     static void setStopBit(UsartStopBits stopBit){
@@ -234,7 +237,8 @@ private:
         /* For MSPIM only.*/
         if(UsartMode::MasterSPI != getUsartMode()) return false;
         /* Bitmask for mspim usart*/
-        constexpr uint8_t bitmask_mspim_mode = ~(RegBits::Uart::UCSR0C_UCPHA0 | RegBits::Uart::UCSR0C_UCPOL0);
+        constexpr uint8_t bitmask_mspim_mode = RegBits::Uart::UCSR0C_UCPHA0|
+                                               RegBits::Uart::UCSR0C_UCPOL0;
         /* Apply mode*/
         mcu::Regs::Uart::UartControlAndStatusRegC.writeMasked(static_cast<uint8_t>(spiMode), bitmask_mspim_mode);
     }
@@ -361,20 +365,20 @@ private:
         Receiver.enable();
         Transmitter.disable();
     }
-    static void init(config_t* cfg){
+    static void init(const config_t& cfg){
         mcu::System::Power::activatePeripheral(Peripheral::Usart0);
-        setUsartMode (cfg->usart_mode);
-        setBaudrate  (cfg->usart_baud);
-        setDataSize  (cfg->usart_data_size);
-        setParityMode(cfg->usart_parity_mode);
-        setStopBit   (cfg->usart_stop_bits);
+        setUsartMode (cfg.usart_mode);
+        setBaudrate  (cfg.usart_baud);
+        setDataSize  (cfg.usart_data_size);
+        setParityMode(cfg.usart_parity_mode);
+        setStopBit   (cfg.usart_stop_bits);
 
         /* Configure interrupts for non-blocking usart usage*/
         Interrupts.attach(UsartInterruptType::RxComplete, handleRxInterrupt);
         Interrupts.attach(UsartInterruptType::DataRegisterEmpty, handleTxInterrupt);
         
-        if(cfg->usart_rx_en) Receiver.enable();
-        if(cfg->usart_tx_en) Transmitter.enable();
+        if(cfg.usart_rx_en) Receiver.enable();
+        if(cfg.usart_tx_en) Transmitter.enable();
     }
     static void reset(){
         Interrupts.disable(UsartInterruptType::AllInterrupts);
